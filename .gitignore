@@ -1,0 +1,43 @@
+# Local virtualenv / embedded runtimes (do not commit)
+.venv/
+python/
+runtime/
+bin/
+
+# Build outputs and caches
+dist/
+cache/
+downloads/
+build/
+dist_exe/
+
+# Python noise
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local app state (user-specific paths)
+settings.json
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local agent / temp notes
+.agents/
+_*.bat
+_*.vbs
+_*.log
+
+# Local planning notes (filename starts with # — escape for gitignore)
+\#*.md
