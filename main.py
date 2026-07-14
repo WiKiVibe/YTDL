@@ -49,7 +49,18 @@ def main(page: ft.Page) -> None:
     except Exception as exc:
         startup_log(f"main() pre-init warning: {exc!r}")
     startup_log("main(page) calling app_main")
-    app_main(page)
+    try:
+        app_main(page)
+    except Exception as exc:
+        startup_log(f"app_main FAILED: {exc!r}\n{traceback.format_exc()}")
+        page.controls.clear()
+        page.bgcolor = "#111111"
+        page.padding = 20
+        page.add(
+            ft.Text("YTDL crashed while starting UI", size=20, color="white"),
+            ft.Text(str(exc), size=14, color="#ffaaaa", selectable=True),
+        )
+        page.update()
 
 
 if __name__ == "__main__":

@@ -1815,16 +1815,30 @@ class YtdlFletApp:
             self.page.window_min_width = min_w
             self.page.window_min_height = min_h
         self.page.padding = 0
-        self.page.bgcolor = BG
+        # Slightly lighter than pure black so a "blank UI" is easier to spot.
+        self.page.bgcolor = BG if not (is_packaged_app() and sys.platform == "darwin") else "#1E1E1E"
         self.page.theme_mode = ft.ThemeMode.DARK
         try:
             self.page.horizontal_alignment = ft.CrossAxisAlignment.STRETCH
             self.page.vertical_alignment = ft.MainAxisAlignment.START
         except Exception:
             pass
-        # Do not clear fonts — empty fonts map can break text rendering on some
-        # packaged Flutter / macOS builds (looks like a pure black window).
-        self.page.on_resize = self.on_resize
+        # Packaged macOS Flutter often fails to pick CJK fonts → Chinese UI looks
+        # like an empty black window. Force a system font stack that exists on macOS.
+        if sys.platform == "darwin":
+            for family in ("PingFang TC", "PingFang SC", "Hiragino Sans", "Helvetica Neue", "Helvetica"):
+                try:
+                    theme = ft.Theme(font_family=family)
+                    self.page.theme = theme
+                    self.page.dark_theme = theme
+                    startup_log(f"theme font_family={family}")
+                    break
+                except Exception:
+                    continue
+        # Do not clear fonts — empty fonts map can break text rendering.
+        # Skip resize-driven re-render on packaged macOS (first frames are 0x0).
+        if not (is_packaged_app() and sys.platform == "darwin"):
+            self.page.on_resize = self.on_resize
         startup_log(f"configure_page window={win_w}x{win_h} ui_scale={self.ui_scale}")
 
     def on_resize(self, _event: Any = None) -> None:
@@ -2218,23 +2232,47 @@ class YtdlFletApp:
 
         # Packaged macOS: nested Stack + Image often paints a solid black frame.
         # Use a simple Column shell (no background image) which is reliable.
+        # Also avoid IconButton-only chrome — some builds fail to load Material icons.
         if is_packaged_app() and sys.platform == "darwin":
-            top_row = ft.Row(
-                controls=[back_button if can_back else ft.Container(width=1, height=1)],
-                alignment=ft.MainAxisAlignment.START,
+            settings_link = ft.TextButton(
+                content="Settings",
+                on_click=lambda _e: self.render("settings"),
+                visible=settings_visible,
+            )
+            back_link = ft.TextButton(
+                content="Back",
+                on_click=self.back,
+                visible=can_back,
             )
             return ft.Container(
                 expand=True,
-                bgcolor=BG,
-                padding=self.shell_padding(),
+                bgcolor="#1E1E1E",
+                padding=20,
                 content=ft.Column(
                     controls=[
-                        top_row,
+                        ft.Text(
+                            "YTDL",
+                            size=28,
+                            weight=ft.FontWeight.BOLD,
+                            color="#FFFFFF",
+                            font_family="Helvetica",
+                        ),
+                        ft.Text(
+                            "macOS build — if you only saw a black window before, fonts/layout were broken.",
+                            size=12,
+                            color="#A0A0A0",
+                            font_family="Helvetica",
+                        ),
+                        ft.Row(
+                            controls=[back_link, settings_link],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
                         ft.Container(content=content, expand=True, alignment=align_center()),
                         bottom_bar,
                     ],
                     expand=True,
-                    spacing=8,
+                    spacing=10,
+                    scroll=ft.ScrollMode.AUTO,
                 ),
             )
 
