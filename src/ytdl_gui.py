@@ -175,6 +175,32 @@ GLASS_SHADOW = "0x66000000"
 DEFAULT_WINDOW_WIDTH = 895
 DEFAULT_WINDOW_HEIGHT = 1425
 
+
+def is_packaged_app() -> bool:
+    if getattr(sys, "frozen", False):
+        return True
+    try:
+        exe = str(Path(sys.executable).resolve())
+        # Flet/serious_python macOS: .../YTDL.app/Contents/MacOS/YTDL
+        if sys.platform == "darwin" and ".app/Contents/MacOS" in exe.replace("\\", "/"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def startup_log(message: str) -> None:
+    """Append a line to a startup log (helps debug black-screen packaged builds)."""
+    try:
+        log_dir = app_data_dir()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        path = log_dir / "startup.log"
+        line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n"
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(line)
+    except Exception:
+        pass
+
 JS_RUNTIME_DIR = APP_ROOT / "bin"
 YTDLP_CACHE_DIR = USER_DATA_DIR / "cache" / "yt-dlp"
 
@@ -1680,40 +1706,46 @@ class YtdlFletApp:
         self.ui_events: queue.Queue[tuple[str, tuple[Any, ...]]] = queue.Queue()
         self.ui_pump_stop = threading.Event()
 
+        startup_log(
+            f"init begin frozen={is_packaged_app()} platform={sys.platform} "
+            f"root={resource_root()} exe={sys.executable}"
+        )
         try:
             self.configure_page()
             self.start_ui_event_pump()
             self.start_auto_update()
             self.render("url", replace=True)
+            startup_log("init render url ok")
         except Exception as exc:
+            startup_log(f"init FAILED: {exc!r}")
             # Packaged builds sometimes fail silently → pure black window.
             try:
-                self.page.controls.clear()
-                self.page.bgcolor = BG
-                self.page.add(
-                    ft.Container(
-                        content=ft.Column(
-                            controls=[
-                                ft.Text("YTDL 啟動失敗", size=22, weight=ft.FontWeight.BOLD, color=TEXT),
-                                ft.Text(str(exc), size=13, color=TEXT_SOFT, selectable=True),
-                                ft.Text(
-                                    f"APP_ROOT={resource_root()}",
-                                    size=11,
-                                    color=TEXT_MUTED,
-                                    selectable=True,
-                                ),
-                            ],
-                            spacing=10,
-                            expand=True,
-                            scroll=ft.ScrollMode.AUTO,
-                        ),
-                        padding=24,
-                        expand=True,
-                    )
-                )
-                self.page.update()
-            except Exception:
-                pass
+                self._show_fatal_error(exc)
+            except Exception as exc2:
+                startup_log(f"fatal UI also failed: {exc2!r}")
+
+    def _show_fatal_error(self, exc: BaseException) -> None:
+        self.page.controls.clear()
+        self.page.bgcolor = "#1a1a1a"
+        self.page.padding = 24
+        self.page.add(
+            ft.Column(
+                controls=[
+                    ft.Text("YTDL failed to start", size=22, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
+                    ft.Text(str(exc), size=14, color="#FFB4B4", selectable=True),
+                    ft.Text(
+                        f"root={resource_root()}\nlog={app_data_dir() / 'startup.log'}",
+                        size=12,
+                        color="#CCCCCC",
+                        selectable=True,
+                    ),
+                ],
+                spacing=12,
+                expand=True,
+                scroll=ft.ScrollMode.AUTO,
+            )
+        )
+        self.page.update()
 
     def configure_page(self) -> None:
         self.page.title = "YTDL"
@@ -1747,6 +1779,11 @@ class YtdlFletApp:
             self.ui_scale = fit
             phys_w = int(phys_w * fit)
             phys_h = int(phys_h * fit)
+        # Packaged macOS: prefer a compact window that fits laptop screens.
+        if is_packaged_app() and sys.platform == "darwin":
+            phys_w = min(phys_w, 720)
+            phys_h = min(phys_h, 900)
+            self.ui_scale = min(self.ui_scale, 0.85)
         win_w = max(1, int(round(phys_w / scale_factor)))
         win_h = max(1, int(round(phys_h / scale_factor)))
         min_w = int(win_w * 0.6)
@@ -1756,6 +1793,10 @@ class YtdlFletApp:
             self.page.window.height = win_h
             self.page.window.min_width = min_w
             self.page.window.min_height = min_h
+            try:
+                self.page.window.visible = True
+            except Exception:
+                pass
         else:
             self.page.window_width = win_w
             self.page.window_height = win_h
@@ -1764,11 +1805,27 @@ class YtdlFletApp:
         self.page.padding = 0
         self.page.bgcolor = BG
         self.page.theme_mode = ft.ThemeMode.DARK
+        try:
+            self.page.horizontal_alignment = ft.CrossAxisAlignment.STRETCH
+            self.page.vertical_alignment = ft.MainAxisAlignment.START
+        except Exception:
+            pass
         # Do not clear fonts — empty fonts map can break text rendering on some
         # packaged Flutter / macOS builds (looks like a pure black window).
         self.page.on_resize = self.on_resize
+        startup_log(f"configure_page window={win_w}x{win_h} ui_scale={self.ui_scale}")
 
     def on_resize(self, _event: Any = None) -> None:
+        # Packaged macOS can fire resize with 0x0 during first layout; re-rendering
+        # then produces an empty/black frame that never recovers.
+        try:
+            w = float(getattr(self.page, "width", 0) or 0)
+            h = float(getattr(self.page, "height", 0) or 0)
+        except Exception:
+            w, h = 0.0, 0.0
+        if w < 80 or h < 80:
+            startup_log(f"on_resize ignored tiny size {w}x{h}")
+            return
         if self.state.current_step != "progress":
             self.render(self.state.current_step, replace=True)
 
@@ -2066,9 +2123,16 @@ class YtdlFletApp:
         if not replace and step != self.state.current_step:
             self.history.append(self.state.current_step)
         self.state.current_step = step
-        self.clear_page()
-        self.page.add(self.app_shell(self.step_content(step)))
-        self.safe_update()
+        try:
+            body = self.step_content(step)
+            shell = self.app_shell(body)
+            self.clear_page()
+            self.page.add(shell)
+            self.safe_update()
+            startup_log(f"render ok step={step}")
+        except Exception as exc:
+            startup_log(f"render FAILED step={step}: {exc!r}")
+            self._show_fatal_error(exc)
 
     def clear_page(self) -> None:
         if hasattr(self.page, "clean"):
@@ -2139,6 +2203,29 @@ class YtdlFletApp:
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             )
+
+        # Packaged macOS: nested Stack + Image often paints a solid black frame.
+        # Use a simple Column shell (no background image) which is reliable.
+        if is_packaged_app() and sys.platform == "darwin":
+            top_row = ft.Row(
+                controls=[back_button if can_back else ft.Container(width=1, height=1)],
+                alignment=ft.MainAxisAlignment.START,
+            )
+            return ft.Container(
+                expand=True,
+                bgcolor=BG,
+                padding=self.shell_padding(),
+                content=ft.Column(
+                    controls=[
+                        top_row,
+                        ft.Container(content=content, expand=True, alignment=align_center()),
+                        bottom_bar,
+                    ],
+                    expand=True,
+                    spacing=8,
+                ),
+            )
+
         # Reserve space at top/bottom so centered content never collides with the
         # back arrow (top-left) or the settings gear (bottom-right).
         top_reserve = self.sc(48) if can_back else 0
