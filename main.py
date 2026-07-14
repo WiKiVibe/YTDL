@@ -18,7 +18,7 @@ def _early_log(message: str) -> None:
 
 
 def main(page: ft.Page) -> None:
-    # Packaged Flet apps call this entry directly (not always __main__).
+    # Packaged Flet apps call this entry (and sometimes also run as __main__).
     _early_log("main(page) entered")
     try:
         from src.ytdl_gui import (
@@ -53,8 +53,9 @@ def main(page: ft.Page) -> None:
 
 
 if __name__ == "__main__":
-    enable_high_dpi()
-    ensure_js_runtime_on_path()
+    # Do not call enable_high_dpi here without imports — packaged Flet runs this
+    # file as __main__ and previously crashed with NameError (black window).
+    _early_log("__main__ starting ft.run")
     if hasattr(ft, "run"):
         ft.run(main, name="YTDL")
     else:
