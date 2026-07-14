@@ -20,8 +20,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# Local app state (user-specific paths)
+# Local app state (user-specific paths / secrets)
 settings.json
+cookies.txt
+*.cookies
 *.log
 
 # Editor / OS

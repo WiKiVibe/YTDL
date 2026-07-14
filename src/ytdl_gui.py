@@ -412,7 +412,7 @@ DEFAULT_COOKIE_FILE = USER_DATA_DIR / "cookies.txt"
 
 def resolve_cookie_file(settings: Settings) -> str | None:
     """A cookies.txt path to use, if any. Explicit setting wins, else auto-detect
-    a cookies.txt sitting next to the app (E:\\YTDL\\cookies.txt)."""
+    a cookies.txt sitting next to the app (e.g. ./cookies.txt)."""
     candidate = (settings.cookie_file or "").strip()
     if candidate:
         path = Path(candidate).expanduser()
