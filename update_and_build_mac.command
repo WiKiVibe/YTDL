@@ -26,7 +26,7 @@ git fetch origin
 echo "[2/4] Reset to origin/main (discards local uncommitted changes)..."
 git reset --hard origin/main
 
-echo "[3/4] chmod scripts..."
+echo "[3/5] chmod scripts..."
 chmod +x \
   build_macos_app.command \
   run.command \
@@ -34,9 +34,15 @@ chmod +x \
   update_and_build_mac.command \
   tools/install_deno_macos.sh 2>/dev/null || true
 
-echo "[4/4] Build macOS app (this can take several minutes)..."
+echo "[4/5] Clear Flet extract cache (prevents stale black-screen builds)..."
+# Flet runs code from here, NOT only from this git folder:
+#   ~/Library/Application Support/app.local.ytdl/flet/app/main.pyc
+rm -rf "${HOME}/Library/Application Support/app.local.ytdl" 2>/dev/null || true
+rm -f "${HOME}/Library/Application Support/YTDL/startup.log" 2>/dev/null || true
+echo "    cleared app.local.ytdl (if it existed)"
+
+echo "[5/5] Build macOS app (this can take several minutes)..."
 echo "Keep external SSD mounted if Xcode lives there."
-echo "Also clears Flet cache: ~/Library/Application Support/app.local.ytdl"
 echo
 ./build_macos_app.command
 
