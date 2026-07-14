@@ -41,13 +41,13 @@ mkdir -p "$APP_DIR/dist"
 
 "$FLET_CMD" build macos "$APP_DIR" \
     --module-name main \
-    --project ytdl_downloader \
-    --artifact "YTDL Downloader" \
-    --product "YTDL Downloader" \
+    --project ytdl \
+    --artifact "YTDL" \
+    --product "YTDL" \
     --description "YouTube downloader GUI" \
     --org "app.local" \
-    --company "YTDL Downloader" \
-    --copyright "YTDL Downloader" \
+    --company "YTDL" \
+    --copyright "YTDL" \
     --build-version "1.0.0" \
     --build-number "1" \
     --arch arm64 x64 \

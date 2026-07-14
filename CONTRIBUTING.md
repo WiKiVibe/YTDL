@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in YTDL Downloader.
+Thanks for your interest in YTDL.
 
 ## Development
 

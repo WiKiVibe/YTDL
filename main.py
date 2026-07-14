@@ -13,6 +13,6 @@ if __name__ == "__main__":
     enable_high_dpi()
     ensure_js_runtime_on_path()
     if hasattr(ft, "run"):
-        ft.run(main, name="YTDL Downloader")
+        ft.run(main, name="YTDL")
     else:
-        ft.app(target=main, name="YTDL Downloader")
+        ft.app(target=main, name="YTDL")

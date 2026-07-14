@@ -21,11 +21,20 @@ This project ships **source on git** and **portable ZIP on Releases**.
 
 ## Every release
 
-### 1. Bump and commit (source)
+### 1. Bump app version (source)
+
+Edit `src/ytdl_gui.py`:
+
+```python
+APP_VERSION = "1.0.1"          # must match the Release tag (v1.0.1 or 1.0.1)
+GITHUB_REPO = "yourname/YTDL"  # required for in-app update toast
+```
+
+Older installs compare their local `APP_VERSION` against the latest GitHub Release tag. If remote is newer, the app shows a toast on startup (no auto-download).
 
 ```bat
 git add -A
-git commit -m "Prepare v1.0.0"
+git commit -m "Prepare v1.0.1"
 git push
 ```
 

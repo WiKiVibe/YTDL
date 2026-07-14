@@ -1,4 +1,4 @@
-YTDL Downloader
+YTDL
 
 請先完整解壓縮 ZIP，不要在 ZIP 視窗裡直接執行。
 
@@ -9,7 +9,7 @@ YTDL Downloader
 4. 之後從桌面捷徑或 02.RUN.bat 啟動。
 
 一般使用：
-- 雙擊桌面的 YTDL Downloader 捷徑。
+- 雙擊桌面的 YTDL 捷徑。
 - 或雙擊 02.RUN.bat。
 
 備註：

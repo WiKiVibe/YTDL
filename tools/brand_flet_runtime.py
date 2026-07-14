@@ -14,9 +14,9 @@ RUNTIME_DIR = APP_ROOT / "runtime" / "flet"
 RUNTIME_EXE = RUNTIME_DIR / "flet.exe"
 MARKER_PATH = RUNTIME_DIR / ".ytdl-runtime-version"
 
-APP_NAME = "YTDL Downloader"
+APP_NAME = "YTDL"
 APP_VERSION = "1.0.0.0"
-COPYRIGHT = "YTDL Downloader"
+COPYRIGHT = "YTDL"
 
 RT_ICON = 3
 RT_GROUP_ICON = 14
@@ -181,9 +181,9 @@ def make_version_resource() -> bytes:
         string_value("CompanyName", APP_NAME),
         string_value("FileDescription", APP_NAME),
         string_value("FileVersion", APP_VERSION),
-        string_value("InternalName", "YTDL Downloader"),
+        string_value("InternalName", "YTDL"),
         string_value("LegalCopyright", COPYRIGHT),
-        string_value("OriginalFilename", "YTDL Downloader.exe"),
+        string_value("OriginalFilename", "YTDL.exe"),
         string_value("ProductName", APP_NAME),
         string_value("ProductVersion", APP_VERSION),
     ]

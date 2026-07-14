@@ -1,1 +1,1 @@
-"""YTDL Downloader application package."""
+"""YTDL application package."""

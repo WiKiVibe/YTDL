@@ -1,4 +1,4 @@
-# YTDL Downloader for macOS
+# YTDL for macOS
 
 This package can run as a Python/Flet app on macOS, or be built into a native
 `.app` bundle on a Mac.
@@ -33,7 +33,7 @@ The app bundle will be written under `dist/macos`.
 ## Notes
 
 - The app stores macOS settings and yt-dlp cache under
-  `~/Library/Application Support/YTDL Downloader`.
+  `~/Library/Application Support/YTDL`.
 - A `cookies.txt` file can still be placed next to the app folder if YouTube
   asks for sign-in verification.
 - For distribution outside your own Mac, Apple signing/notarization may still

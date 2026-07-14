@@ -1,4 +1,4 @@
-# YTDL Downloader
+# YTDL
 
 Windows-first GUI for [yt-dlp](https://github.com/yt-dlp/yt-dlp), built with [Flet](https://flet.dev/).
 
@@ -74,7 +74,10 @@ python\pythonw.exe  +  src\ytdl_gui.py
 - Audio: WAV / MP3 / AAC (320k target for MP3/AAC)
 - 4K + H.264: download best source then transcode (NVENC when available)
 - Optional: download **uploader/official CC** as SRT (`writesubtitles`, never auto-subs)
+- Optional: on startup, check GitHub Releases for a newer app version (toast only)
 - Settings: output folder, open folder when done, NVENC preference, …
+
+Update check needs `GITHUB_REPO = "owner/repo"` and `APP_VERSION` in `src/ytdl_gui.py` (see `RELEASE.md`).
 
 Default save location: Windows Downloads folder. Filenames get a `_YTDL` suffix.
 

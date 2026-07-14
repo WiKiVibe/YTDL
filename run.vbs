@@ -25,18 +25,18 @@ End Function
 If Not fso.FileExists(pythonw) Or Not fso.FileExists(python) Then
   MsgBox "Bundled Python was not found." & vbCrLf & vbCrLf & _
     "Expected:" & vbCrLf & pythonw & vbCrLf & vbCrLf & _
-    "This folder should contain the python\ directory.", 16, "YTDL Downloader"
+    "This folder should contain the python\ directory.", 16, "YTDL"
   WScript.Quit 1
 End If
 
 If Not fso.FileExists(scriptPath) Then
-  MsgBox "App script not found:" & vbCrLf & scriptPath, 16, "YTDL Downloader"
+  MsgBox "App script not found:" & vbCrLf & scriptPath, 16, "YTDL"
   WScript.Quit 1
 End If
 
 If Not HasModule(python, "flet") Or Not HasModule(python, "yt_dlp") Or Not HasModule(python, "imageio_ffmpeg") Then
   MsgBox "Bundled Python packages are incomplete." & vbCrLf & _
-    "Python: " & python, 16, "YTDL Downloader"
+    "Python: " & python, 16, "YTDL"
   WScript.Quit 1
 End If
 

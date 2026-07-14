@@ -11,6 +11,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -29,7 +31,7 @@ APP_ROOT = resource_root()
 
 def app_data_dir() -> Path:
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "YTDL Downloader"
+        return Path.home() / "Library" / "Application Support" / "YTDL"
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return APP_ROOT
@@ -42,6 +44,14 @@ BACKGROUND_SVG = APP_ROOT / "pic" / "BG.svg"
 APP_ICON_ICO = APP_ROOT / "pic" / "YTDL_LOGO.ico"
 APP_ICON_PNG = APP_ROOT / "pic" / "YTDL_LOGO.png"
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+# Local app version. Bump this when you publish a matching GitHub Release tag
+# (tag "v1.0.1" or "1.0.1" both compare as 1.0.1).
+APP_VERSION = "1.0.0"
+# GitHub "owner/repo" used for Releases update check.
+# Leave empty to disable. Example: "yourname/YTDL"
+# Override at runtime with env var YTDL_GITHUB_REPO if needed.
+GITHUB_REPO = (os.environ.get("YTDL_GITHUB_REPO") or "").strip()
 
 VIDEO_QUALITIES = ("AUTO", "4K", "HD")
 VIDEO_CODECS = ("AUTO", "H264", "AV1")
@@ -80,6 +90,62 @@ DEFAULT_WINDOW_HEIGHT = 1425
 
 JS_RUNTIME_DIR = APP_ROOT / "bin"
 YTDLP_CACHE_DIR = USER_DATA_DIR / "cache" / "yt-dlp"
+
+
+def parse_version_tuple(version: str) -> tuple[int, ...]:
+    """Parse 'v1.2.3' / '1.2.3-beta' into a comparable int tuple."""
+    text = (version or "").strip()
+    if text.lower().startswith("v"):
+        text = text[1:]
+    parts: list[int] = []
+    for chunk in text.split("."):
+        digits = ""
+        for ch in chunk:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        parts.append(int(digits) if digits else 0)
+    while parts and parts[-1] == 0 and len(parts) > 1:
+        parts.pop()
+    return tuple(parts) if parts else (0,)
+
+
+def is_remote_version_newer(remote: str, local: str) -> bool:
+    return parse_version_tuple(remote) > parse_version_tuple(local)
+
+
+def fetch_latest_github_release(
+    repo: str,
+    *,
+    timeout: float = 6.0,
+) -> dict[str, str] | None:
+    """Return {tag, url} for the latest GitHub Release, or None on failure."""
+    repo = (repo or "").strip().strip("/")
+    if not repo or "/" not in repo:
+        return None
+    api_url = f"https://api.github.com/repos/{repo}/releases/latest"
+    request = urllib.request.Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"YTDL/{APP_VERSION}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    tag = str(payload.get("tag_name") or payload.get("name") or "").strip()
+    if not tag:
+        return None
+    html_url = str(payload.get("html_url") or f"https://github.com/{repo}/releases/latest").strip()
+    return {"tag": tag, "url": html_url}
 
 
 def bundled_deno_path() -> Path | None:
@@ -1503,7 +1569,7 @@ class YtdlFletApp:
         self.render("url", replace=True)
 
     def configure_page(self) -> None:
-        self.page.title = "YTDL Downloader"
+        self.page.title = "YTDL"
         icon_path = APP_ICON_ICO if APP_ICON_ICO.exists() else (
             APP_ICON_PNG if APP_ICON_PNG.exists() else None
         )
@@ -1696,6 +1762,7 @@ class YtdlFletApp:
             self.set_status("正在準備核心...")
 
         if getattr(sys, "frozen", False):
+            self.check_github_release_update()
             self.safe_update()
             return
 
@@ -1709,7 +1776,32 @@ class YtdlFletApp:
         else:
             self.state.ready = False
             self.set_status("必要元件載入失敗，請重新執行 install.bat")
+        # Non-blocking for the UI thread (we are already in a background worker).
+        self.check_github_release_update()
         self.safe_update()
+
+    def check_github_release_update(self) -> None:
+        """If GitHub has a newer Release than APP_VERSION, show a toast."""
+        repo = GITHUB_REPO
+        if not repo:
+            return
+        try:
+            latest = fetch_latest_github_release(repo)
+            if not latest:
+                return
+            remote_tag = latest["tag"]
+            if not is_remote_version_newer(remote_tag, APP_VERSION):
+                self.log(f"版本檢查：已是最新（目前 {APP_VERSION}，遠端 {remote_tag}）。")
+                return
+            message = (
+                f"有新版本可用：{remote_tag}（目前 {APP_VERSION}）。"
+                f"請到 GitHub Releases 下載更新。"
+            )
+            self.log(message)
+            self.log(f"下載頁：{latest['url']}")
+            self.toast(message)
+        except Exception as exc:
+            self.log(f"版本檢查略過：{exc}")
 
     def auto_update_worker(self) -> None:
         if self.state.yt_dlp is not None:
@@ -2756,7 +2848,9 @@ class YtdlFletApp:
                 self.setting_switch("偵測到 NVIDIA 時優先使用 NVENC", prefer_nvenc, scale=scale),
                 ft.Container(
                     content=ft.Text(
-                        "啟動時仍會自動更新核心，並自動使用內建 Deno 處理 YouTube 驗證。",
+                        f"版本 {APP_VERSION}"
+                        + (f"  ·  啟動時會檢查 GitHub Releases 是否有更新（{GITHUB_REPO}）。" if GITHUB_REPO else "  ·  尚未設定 GitHub 倉庫，略過更新檢查。")
+                        + " 啟動時仍會自動更新核心，並使用內建 Deno 處理 YouTube 驗證。",
                         size=note_size,
                         color=TEXT_MUTED,
                     ),
@@ -3095,6 +3189,6 @@ if __name__ == "__main__":
     enable_high_dpi()
     ensure_js_runtime_on_path()
     if hasattr(ft, "run"):
-        ft.run(main, name="YTDL Downloader")
+        ft.run(main, name="YTDL")
     else:
-        ft.app(target=main, name="YTDL Downloader")
+        ft.app(target=main, name="YTDL")

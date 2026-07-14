@@ -5,7 +5,7 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
 
 echo
-echo "YTDL Downloader macOS installer"
+echo "YTDL macOS installer"
 echo "================================"
 echo
 
@@ -52,7 +52,7 @@ if [ -f "$APP_DIR/tools/install_deno_macos.sh" ]; then
 fi
 
 echo
-echo "Install complete. You can launch YTDL Downloader with run.command."
+echo "Install complete. You can launch YTDL with run.command."
 echo
 
 if [ "${YTDL_SKIP_PAUSE:-0}" != "1" ] && [ -t 0 ]; then

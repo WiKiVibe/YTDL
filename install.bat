@@ -6,7 +6,7 @@ set "APP_DIR=%~dp0"
 cd /d "%APP_DIR%"
 
 echo.
-echo YTDL Downloader installer
+echo YTDL installer
 echo =========================
 echo.
 
@@ -40,7 +40,7 @@ if errorlevel 1 (
 )
 
 echo [3/3] Creating desktop shortcut...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $app=(Resolve-Path '%APP_DIR%').Path; $shell=New-Object -ComObject WScript.Shell; $desktop=[Environment]::GetFolderPath('Desktop'); $shortcut=$shell.CreateShortcut([IO.Path]::Combine($desktop,'YTDL Downloader.lnk')); $shortcut.TargetPath=(Join-Path $env:SystemRoot 'System32\wscript.exe'); $shortcut.Arguments='\"' + (Join-Path $app 'run.vbs') + '\"'; $shortcut.WorkingDirectory=$app; $icon=(Join-Path $app 'pic\YTDL_LOGO.ico'); if (Test-Path $icon) { $shortcut.IconLocation=$icon + ',0' } else { $shortcut.IconLocation=(Join-Path $env:SystemRoot 'System32\shell32.dll') + ',220' }; $shortcut.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $app=(Resolve-Path '%APP_DIR%').Path; $shell=New-Object -ComObject WScript.Shell; $desktop=[Environment]::GetFolderPath('Desktop'); $shortcut=$shell.CreateShortcut([IO.Path]::Combine($desktop,'YTDL.lnk')); $shortcut.TargetPath=(Join-Path $env:SystemRoot 'System32\wscript.exe'); $shortcut.Arguments='\"' + (Join-Path $app 'run.vbs') + '\"'; $shortcut.WorkingDirectory=$app; $icon=(Join-Path $app 'pic\YTDL_LOGO.ico'); if (Test-Path $icon) { $shortcut.IconLocation=$icon + ',0' } else { $shortcut.IconLocation=(Join-Path $env:SystemRoot 'System32\shell32.dll') + ',220' }; $shortcut.Save()"
 if errorlevel 1 (
     echo Desktop shortcut could not be created. You can still use 02.RUN.bat.
     pause
@@ -48,6 +48,6 @@ if errorlevel 1 (
 )
 
 echo.
-echo Install complete. You can launch YTDL Downloader from the desktop shortcut or 02.RUN.bat.
+echo Install complete. You can launch YTDL from the desktop shortcut or 02.RUN.bat.
 echo.
 pause
