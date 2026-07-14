@@ -51,7 +51,7 @@ APP_VERSION = "1.0.0"
 # GitHub "owner/repo" used for Releases update check.
 # Leave empty to disable. Example: "yourname/YTDL"
 # Override at runtime with env var YTDL_GITHUB_REPO if needed.
-GITHUB_REPO = (os.environ.get("YTDL_GITHUB_REPO") or "").strip()
+GITHUB_REPO = (os.environ.get("YTDL_GITHUB_REPO") or "WiKiVibe/YTDL").strip()
 
 VIDEO_QUALITIES = ("AUTO", "4K", "HD")
 VIDEO_CODECS = ("AUTO", "H264", "AV1")

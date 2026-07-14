@@ -18,7 +18,21 @@ $pythonVersion = "3.14.6"
 $pythonEmbedName = "python-$pythonVersion-embed-amd64.zip"
 $pythonEmbedUrl = "https://www.python.org/ftp/python/$pythonVersion/$pythonEmbedName"
 $pythonEmbedCache = Join-Path $cacheDir $pythonEmbedName
-$sourceSitePackages = Join-Path $root ".venv\Lib\site-packages"
+$venvSitePackages = Join-Path $root ".venv\Lib\site-packages"
+$portableSitePackages = Join-Path $root "python\Lib\site-packages"
+$venvPython = Join-Path $root ".venv\Scripts\python.exe"
+$sourceSitePackages = $null
+# Prefer a working portable tree, then a working venv.
+if (Test-Path $portableSitePackages) {
+    $sourceSitePackages = $portableSitePackages
+    Write-Host "Using portable python site-packages: $sourceSitePackages"
+} elseif ((Test-Path $venvSitePackages) -and (Test-Path $venvPython)) {
+    $sourceSitePackages = $venvSitePackages
+    Write-Host "Using venv site-packages: $sourceSitePackages"
+} elseif (Test-Path $venvSitePackages) {
+    $sourceSitePackages = $venvSitePackages
+    Write-Host "Using venv site-packages (python may be broken): $sourceSitePackages"
+}
 
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
 $distPath = (Resolve-Path $dist).Path

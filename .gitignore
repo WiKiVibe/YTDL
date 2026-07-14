@@ -41,3 +41,8 @@ _*.log
 
 # Local planning notes (filename starts with # — escape for gitignore)
 \#*.md
+
+# Local GitHub helper scripts
+setup_github.bat
+_gh_*
+

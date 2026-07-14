@@ -12,7 +12,7 @@ Paste a YouTube URL (or playlist), pick video/audio options, and download. Optio
 
 | Audience | What to use |
 |----------|-------------|
-| **Most users** | Download the portable **ZIP** from [GitHub Releases](../../releases) — no Python install needed |
+| **Most users** | Download the portable **ZIP** from [Releases](https://github.com/WiKiVibe/YTDL/releases) — no Python install needed |
 | **Developers** | Clone this repo and run from source (see below) |
 
 Release ZIPs are built with `package.ps1` and are **not** stored in git history.
@@ -41,7 +41,7 @@ Details: [`README-share.txt`](README-share.txt) (copied into the ZIP as `README.
 ### Setup
 
 ```bat
-git clone <your-repo-url> YTDL
+git clone https://github.com/WiKiVibe/YTDL.git
 cd YTDL
 python -m venv .venv
 .venv\Scripts\activate
