@@ -21,9 +21,57 @@ import flet as ft
 
 
 def resource_root() -> Path:
+    """Locate project root (pic/, src/, bin/) for dev and packaged builds."""
+    candidates: list[Path] = []
+
+    # PyInstaller
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS)  # type: ignore[attr-defined]
-    return Path(__file__).resolve().parents[1]
+        candidates.append(Path(sys._MEIPASS))  # type: ignore[attr-defined]
+
+    # Flet / serious_python macOS / Windows app bundle
+    if getattr(sys, "frozen", False):
+        exe = Path(sys.executable).resolve()
+        # YTDL.app/Contents/MacOS/YTDL → Resources / Resources/app
+        candidates.extend(
+            [
+                exe.parent.parent / "Resources" / "app",
+                exe.parent.parent / "Resources",
+                exe.parent.parent / "Frameworks",
+                exe.parent,
+            ]
+        )
+
+    # Env hints used by some Flet desktop builds
+    for key in ("FLET_APP_STORAGE_DATA", "FLET_APP_HOME", "APP_ROOT"):
+        value = (os.environ.get(key) or "").strip()
+        if value:
+            candidates.append(Path(value))
+
+    # Source layout: .../src/ytdl_gui.py → project root
+    try:
+        candidates.append(Path(__file__).resolve().parents[1])
+    except Exception:
+        pass
+
+    candidates.append(Path.cwd())
+
+    seen: set[str] = set()
+    for path in candidates:
+        try:
+            resolved = path.resolve()
+        except Exception:
+            resolved = path
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        if (resolved / "pic").is_dir() or (resolved / "src").is_dir() or (resolved / "assets").is_dir():
+            return resolved
+
+    try:
+        return Path(__file__).resolve().parents[1]
+    except Exception:
+        return Path.cwd()
 
 
 APP_ROOT = resource_root()
@@ -39,10 +87,49 @@ def app_data_dir() -> Path:
 
 USER_DATA_DIR = app_data_dir()
 SETTINGS_PATH = USER_DATA_DIR / "settings.json"
-BACKGROUND_IMAGE = APP_ROOT / "pic" / "BG.jpg"
-BACKGROUND_SVG = APP_ROOT / "pic" / "BG.svg"
-APP_ICON_ICO = APP_ROOT / "pic" / "YTDL_LOGO.ico"
-APP_ICON_PNG = APP_ROOT / "pic" / "YTDL_LOGO.png"
+
+
+def background_image_path() -> Path:
+    root = resource_root()
+    for relative in ("pic/BG.jpg", "assets/BG.jpg", "BG.jpg"):
+        path = root / relative
+        if path.is_file():
+            return path
+    return root / "pic" / "BG.jpg"
+
+
+def background_svg_path() -> Path:
+    root = resource_root()
+    for relative in ("pic/BG.svg", "assets/BG.svg", "BG.svg"):
+        path = root / relative
+        if path.is_file():
+            return path
+    return root / "pic" / "BG.svg"
+
+
+def app_icon_ico_path() -> Path:
+    root = resource_root()
+    for relative in ("pic/YTDL_LOGO.ico", "assets/icon.ico", "YTDL_LOGO.ico"):
+        path = root / relative
+        if path.is_file():
+            return path
+    return root / "pic" / "YTDL_LOGO.ico"
+
+
+def app_icon_png_path() -> Path:
+    root = resource_root()
+    for relative in ("pic/YTDL_LOGO.png", "assets/icon.png", "assets/icon_macos.png", "YTDL_LOGO.png"):
+        path = root / relative
+        if path.is_file():
+            return path
+    return root / "pic" / "YTDL_LOGO.png"
+
+
+# Kept for compatibility with older code paths / packaging tools.
+BACKGROUND_IMAGE = background_image_path()
+BACKGROUND_SVG = background_svg_path()
+APP_ICON_ICO = app_icon_ico_path()
+APP_ICON_PNG = app_icon_png_path()
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 # Local app version. Bump this when you publish a matching GitHub Release tag
@@ -221,22 +308,28 @@ def dpi_scale() -> float:
 
 def screen_work_area() -> tuple[int, int] | None:
     """Return the usable (width, height) of the primary monitor in pixels."""
-    if os.name != "nt":
-        return None
-    try:
-        import ctypes
-        from ctypes import wintypes
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
 
-        SPI_GETWORKAREA = 0x0030
-        rect = wintypes.RECT()
-        if ctypes.windll.user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(rect), 0):
-            width = int(rect.right - rect.left)
-            height = int(rect.bottom - rect.top)
-            if width > 0 and height > 0:
-                return width, height
-    except Exception:
+            SPI_GETWORKAREA = 0x0030
+            rect = wintypes.RECT()
+            if ctypes.windll.user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(rect), 0):
+                width = int(rect.right - rect.left)
+                height = int(rect.bottom - rect.top)
+                if width > 0 and height > 0:
+                    return width, height
+        except Exception:
+            return None
         return None
-    return None
+
+    # macOS / Linux: avoid a 1425px-tall window that can leave content looking "blank"
+    # on laptop screens when work-area APIs are unavailable.
+    if sys.platform == "darwin":
+        # Logical-ish safe defaults for MacBook Air / 13–15" displays.
+        return (1440, 900)
+    return (1280, 800)
 
 
 class DownloadCancelled(Exception):
@@ -863,14 +956,16 @@ def unique_path(path: Path) -> Path:
 
 
 def load_background_bytes() -> bytes | None:
-    if BACKGROUND_IMAGE.exists():
+    image_path = background_image_path()
+    if image_path.exists():
         try:
-            return BACKGROUND_IMAGE.read_bytes()
+            return image_path.read_bytes()
         except OSError:
             return None
-    if BACKGROUND_SVG.exists():
+    svg_path = background_svg_path()
+    if svg_path.exists():
         try:
-            svg = BACKGROUND_SVG.read_text(encoding="utf-8")
+            svg = svg_path.read_text(encoding="utf-8")
         except OSError:
             return None
         match = re.search(r"data:image/jpeg;base64,([^\"]+)", svg)
@@ -882,6 +977,28 @@ def load_background_bytes() -> bytes | None:
             except Exception:
                 return None
     return None
+
+
+def make_background_control() -> ft.Control:
+    """Background for the shell. Prefer solid color if image fails (packaged builds)."""
+    data = load_background_bytes()
+    if not data:
+        return ft.Container(bgcolor=BG, expand=True)
+    try:
+        import base64
+
+        encoded = base64.b64encode(data).decode("ascii")
+        # Prefer src_base64 when available (more reliable in packaged Flutter views).
+        image_kwargs: dict[str, Any] = {
+            "fit": ft.BoxFit.COVER,
+            "expand": True,
+        }
+        try:
+            return ft.Image(src_base64=encoded, **image_kwargs)
+        except TypeError:
+            return ft.Image(src=data, **image_kwargs)
+    except Exception:
+        return ft.Container(bgcolor=BG, expand=True)
 
 
 class QueueLogger:
@@ -1563,16 +1680,46 @@ class YtdlFletApp:
         self.ui_events: queue.Queue[tuple[str, tuple[Any, ...]]] = queue.Queue()
         self.ui_pump_stop = threading.Event()
 
-        self.configure_page()
-        self.start_ui_event_pump()
-        self.start_auto_update()
-        self.render("url", replace=True)
+        try:
+            self.configure_page()
+            self.start_ui_event_pump()
+            self.start_auto_update()
+            self.render("url", replace=True)
+        except Exception as exc:
+            # Packaged builds sometimes fail silently → pure black window.
+            try:
+                self.page.controls.clear()
+                self.page.bgcolor = BG
+                self.page.add(
+                    ft.Container(
+                        content=ft.Column(
+                            controls=[
+                                ft.Text("YTDL 啟動失敗", size=22, weight=ft.FontWeight.BOLD, color=TEXT),
+                                ft.Text(str(exc), size=13, color=TEXT_SOFT, selectable=True),
+                                ft.Text(
+                                    f"APP_ROOT={resource_root()}",
+                                    size=11,
+                                    color=TEXT_MUTED,
+                                    selectable=True,
+                                ),
+                            ],
+                            spacing=10,
+                            expand=True,
+                            scroll=ft.ScrollMode.AUTO,
+                        ),
+                        padding=24,
+                        expand=True,
+                    )
+                )
+                self.page.update()
+            except Exception:
+                pass
 
     def configure_page(self) -> None:
         self.page.title = "YTDL"
-        icon_path = APP_ICON_ICO if APP_ICON_ICO.exists() else (
-            APP_ICON_PNG if APP_ICON_PNG.exists() else None
-        )
+        ico = app_icon_ico_path()
+        png = app_icon_png_path()
+        icon_path = ico if ico.exists() else (png if png.exists() else None)
         if icon_path is not None:
             if hasattr(self.page, "window"):
                 try:
@@ -1617,7 +1764,8 @@ class YtdlFletApp:
         self.page.padding = 0
         self.page.bgcolor = BG
         self.page.theme_mode = ft.ThemeMode.DARK
-        self.page.fonts = {}
+        # Do not clear fonts — empty fonts map can break text rendering on some
+        # packaged Flutter / macOS builds (looks like a pure black window).
         self.page.on_resize = self.on_resize
 
     def on_resize(self, _event: Any = None) -> None:
@@ -2015,19 +2163,9 @@ class YtdlFletApp:
             padding=self.shell_padding(),
             expand=True,
         )
-        background_bytes = load_background_bytes()
-        if background_bytes:
-            background = ft.Image(
-                src=background_bytes,
-                fit=ft.BoxFit.COVER,
-                expand=True,
-            )
-        else:
-            background = ft.Container(bgcolor=BG, expand=True)
-
         return ft.Stack(
             controls=[
-                background,
+                make_background_control(),
                 ft.Container(bgcolor="0x18000000", expand=True),
                 foreground,
             ],

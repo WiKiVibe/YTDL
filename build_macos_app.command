@@ -26,6 +26,13 @@ fi
 mkdir -p "$APP_DIR/assets"
 cp -f "$APP_DIR/pic/YTDL_LOGO.png" "$APP_DIR/assets/icon.png"
 cp -f "$APP_DIR/pic/YTDL_LOGO.png" "$APP_DIR/assets/icon_macos.png"
+# Ensure background art is available inside the packaged app as well.
+if [ -f "$APP_DIR/pic/BG.jpg" ]; then
+    cp -f "$APP_DIR/pic/BG.jpg" "$APP_DIR/assets/BG.jpg"
+fi
+if [ -f "$APP_DIR/pic/BG.svg" ]; then
+    cp -f "$APP_DIR/pic/BG.svg" "$APP_DIR/assets/BG.svg"
+fi
 
 FLET_CMD="$APP_DIR/.venv/bin/flet"
 if [ ! -x "$FLET_CMD" ]; then
