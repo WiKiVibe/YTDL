@@ -47,9 +47,21 @@ def resource_root() -> Path:
         if value:
             candidates.append(Path(value))
 
+    # Flet macOS extract dir: ~/Library/Application Support/<bundle>/flet/app
+    try:
+        support = Path.home() / "Library" / "Application Support"
+        if support.is_dir():
+            for app_dir in support.glob("*/flet/app"):
+                candidates.append(app_dir)
+                candidates.append(app_dir.parent.parent)  # bundle support root
+    except Exception:
+        pass
+
     # Source layout: .../src/ytdl_gui.py → project root
     try:
-        candidates.append(Path(__file__).resolve().parents[1])
+        here = Path(__file__).resolve()
+        candidates.append(here.parent)  # next to ytdl_gui.py (sometimes app root)
+        candidates.append(here.parents[1])  # .../src/ytdl_gui.py → project root
     except Exception:
         pass
 

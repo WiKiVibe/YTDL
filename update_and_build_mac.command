@@ -36,6 +36,7 @@ chmod +x \
 
 echo "[4/4] Build macOS app (this can take several minutes)..."
 echo "Keep external SSD mounted if Xcode lives there."
+echo "Also clears Flet cache: ~/Library/Application Support/app.local.ytdl"
 echo
 ./build_macos_app.command
 

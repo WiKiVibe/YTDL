@@ -46,6 +46,12 @@ fi
 
 mkdir -p "$APP_DIR/dist"
 
+# Flet caches extracted Python under Application Support. Stale main.pyc there
+# causes "black window" after rebuilds because the .app still loads old code.
+echo "Clearing previous Flet app extract cache (if any)..."
+rm -rf "${HOME}/Library/Application Support/app.local.ytdl" 2>/dev/null || true
+rm -rf "${HOME}/Library/Application Support/YTDL/startup.log" 2>/dev/null || true
+
 "$FLET_CMD" build macos "$APP_DIR" \
     --module-name main \
     --project ytdl \
