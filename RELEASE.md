@@ -26,15 +26,15 @@ This project ships **source on git** and **portable ZIP on Releases**.
 Edit `src/ytdl_gui.py`:
 
 ```python
-APP_VERSION = "1.0.1"          # must match the Release tag (v1.0.1 or 1.0.1)
-GITHUB_REPO = "yourname/YTDL"  # required for in-app update toast
+APP_VERSION = "1.0.2"          # must match the Release tag (v1.0.2 or 1.0.2)
+GITHUB_REPO = "WiKiVibe/YTDL"  # required for in-app update toast
 ```
 
 Older installs compare their local `APP_VERSION` against the latest GitHub Release tag. If remote is newer, the app shows a toast on startup (no auto-download).
 
 ```bat
 git add -A
-git commit -m "Prepare v1.0.1"
+git commit -m "Prepare v1.0.2"
 git push
 ```
 
@@ -71,8 +71,8 @@ dist/YTDL-MAC.zip
 ### 4. Create the GitHub Release
 
 1. GitHub → **Releases** → **Draft a new release**
-2. **Choose a tag**: `v1.0.1` (create new tag on publish)
-3. **Title**: `YTDL v1.0.1`
+2. **Choose a tag**: `v1.0.2` (create new tag on publish)
+3. **Title**: `YTDL v1.0.2`
 4. **Describe** user-facing changes (Chinese or English is fine)
 5. **Attach** `dist\YTDL-WIN.zip` and `dist/YTDL-MAC.zip` (the Mac asset can be added later)
 6. Publish

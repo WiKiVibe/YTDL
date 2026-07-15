@@ -164,13 +164,13 @@ APP_ICON_PNG = app_icon_png_path()
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 # Local app version. Bump this when you publish a matching GitHub Release tag
-# (tag "v1.0.1" or "1.0.1" both compare as 1.0.1).
-APP_VERSION = "1.0.1"
+# (tag "v1.0.2" or "1.0.2" both compare as 1.0.2).
+APP_VERSION = "1.0.2"
 # GitHub "owner/repo" used for Releases update check.
 # Leave empty to disable. Example: "yourname/YTDL"
 # Override at runtime with env var YTDL_GITHUB_REPO if needed.
 GITHUB_REPO = (os.environ.get("YTDL_GITHUB_REPO") or "WiKiVibe/YTDL").strip()
-WIKIVIBE_URL = "https://portaly.cc/WiKiVibe"
+WIKIVIBE_URL = f"https://github.com/{GITHUB_REPO}"
 
 LANGUAGE_AUTO = "auto"
 LANGUAGE_ZH = "zh"
@@ -2473,41 +2473,23 @@ class YtdlFletApp:
         else:
             self.render("url", replace=True)
 
-    def sponsor_controls(self) -> tuple[ft.Control, ft.Control]:
+    def sponsor_controls(self, footer_size: int) -> tuple[ft.Control, ft.Control]:
         icon_size = max(19, int(24 * self.ui_scale * 0.8))
-        qr_size = max(138, int(178 * self.ui_scale * 0.85))
         bubble_src = png_data_uri(support_image_path("Bubble-tea.png"))
-        qr_src = png_data_uri(support_image_path("portaly_wikivibe.png"))
-        qr_popup = ft.Container(
-            content=(
-                ft.Image(src=qr_src, width=qr_size, height=qr_size, fit=ft.BoxFit.CONTAIN)
-                if qr_src
-                else ft.Text("WiKiVibe", color="#111111", weight=ft.FontWeight.BOLD)
-            ),
-            width=qr_size + 16,
-            height=qr_size + 16,
-            padding=8,
-            bgcolor="#FFFFFF",
-            border=border_all(1, "#E5E7EB"),
-            border_radius=8,
-            shadow=glass_shadow(),
-            visible=False,
-            right=0,
-            bottom=self.sc(34),
-        )
-
-        def show_qr(event: Any) -> None:
-            qr_popup.visible = str(getattr(event, "data", "")).lower() in ("true", "1")
-            try:
-                qr_popup.update()
-            except Exception:
-                pass
 
         def open_support(_event: Any = None) -> None:
             try:
                 webbrowser.open_new_tab(WIKIVIBE_URL)
             except Exception as exc:
                 self.toast(str(exc))
+
+        by_wikivibe = ft.Container(
+            content=ft.Text("By WiKiVibe", size=footer_size, color=TEXT_MUTED),
+            border_radius=4,
+            tooltip="GitHub",
+            on_click=open_support,
+            ink=True,
+        )
 
         bubble_content: ft.Control
         if bubble_src:
@@ -2525,12 +2507,11 @@ class YtdlFletApp:
             height=icon_size + 6,
             alignment=align_center(),
             border_radius=4,
-            tooltip=tr("支持 WiKiVibe"),
-            on_hover=show_qr,
+            tooltip="GitHub",
             on_click=open_support,
             ink=True,
         )
-        return bubble_button, qr_popup
+        return by_wikivibe, bubble_button
 
     def app_shell(self, content: ft.Control) -> ft.Control:
         can_back = self.state.current_step not in ("url", "progress")
@@ -2549,7 +2530,6 @@ class YtdlFletApp:
             on_click=self.back,
         )
         settings_visible = self.state.current_step != "settings"
-        sponsor_qr_popup: ft.Control = ft.Container(visible=False)
         bottom_bar = ft.Row(
             controls=[
                 ft.Row(
@@ -2574,7 +2554,7 @@ class YtdlFletApp:
         )
         if self.state.current_step == "settings":
             self.bottom_status_text = None
-            sponsor_button, sponsor_qr_popup = self.sponsor_controls()
+            by_wikivibe, sponsor_button = self.sponsor_controls(footer_size)
             bottom_bar = ft.Row(
                 controls=[
                     ft.Row(
@@ -2587,7 +2567,7 @@ class YtdlFletApp:
                     ),
                     ft.Row(
                         controls=[
-                            ft.Text("By WiKiVibe", size=footer_size, color=TEXT_MUTED),
+                            by_wikivibe,
                             sponsor_button,
                         ],
                         spacing=max(3, int(6 * self.ui_scale)),
@@ -2615,7 +2595,6 @@ class YtdlFletApp:
                     ),
                     ft.Container(content=back_button, left=0, top=0),
                     ft.Container(content=bottom_bar, left=0, right=0, bottom=0),
-                    sponsor_qr_popup,
                 ],
                 fit=ft.StackFit.EXPAND,
                 expand=True,
