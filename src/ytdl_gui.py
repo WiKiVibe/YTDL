@@ -572,7 +572,7 @@ def dpi_scale() -> float:
 
 
 def screen_work_area() -> tuple[int, int] | None:
-    """Return the usable (width, height) of the primary monitor in pixels."""
+    """Return the primary display/work-area size in native window coordinates."""
     if os.name == "nt":
         try:
             import ctypes
@@ -589,12 +589,80 @@ def screen_work_area() -> tuple[int, int] | None:
             return None
         return None
 
-    # macOS / Linux: avoid a 1425px-tall window that can leave content looking "blank"
-    # on laptop screens when work-area APIs are unavailable.
     if sys.platform == "darwin":
-        # Logical-ish safe defaults for MacBook Air / 13–15" displays.
+        # CoreGraphics returns the primary display bounds in logical coordinates,
+        # matching the virtual pixels used by Flet window positioning.
+        try:
+            import ctypes
+
+            class CGPoint(ctypes.Structure):
+                _fields_ = [("x", ctypes.c_double), ("y", ctypes.c_double)]
+
+            class CGSize(ctypes.Structure):
+                _fields_ = [("width", ctypes.c_double), ("height", ctypes.c_double)]
+
+            class CGRect(ctypes.Structure):
+                _fields_ = [("origin", CGPoint), ("size", CGSize)]
+
+            core_graphics = ctypes.CDLL(
+                "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
+            )
+            core_graphics.CGMainDisplayID.restype = ctypes.c_uint32
+            core_graphics.CGDisplayBounds.argtypes = [ctypes.c_uint32]
+            core_graphics.CGDisplayBounds.restype = CGRect
+            display_id = core_graphics.CGMainDisplayID()
+            bounds = core_graphics.CGDisplayBounds(display_id)
+            width = int(round(bounds.size.width))
+            height = int(round(bounds.size.height))
+            if width > 0 and height > 0:
+                return width, height
+        except Exception:
+            pass
+
+        # Finder is a dependency-free fallback for unusual PyInstaller/ctypes
+        # environments. Its desktop bounds are also reported in logical pixels.
+        try:
+            result = subprocess.run(
+                [
+                    "osascript",
+                    "-e",
+                    'tell application "Finder" to get bounds of window of desktop',
+                ],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+            values = [int(value) for value in re.findall(r"-?\d+", result.stdout)]
+            if len(values) >= 4:
+                width = values[2] - values[0]
+                height = values[3] - values[1]
+                if width > 0 and height > 0:
+                    return width, height
+        except Exception:
+            pass
+
         return (1440, 900)
     return (1280, 800)
+
+
+def macos_window_geometry(
+    screen_size: tuple[int, int],
+) -> tuple[int, int, int, int, int, int, float]:
+    """Return a centered laptop-safe Flet window geometry for macOS."""
+    screen_width, screen_height = screen_size
+    usable_width = max(320, screen_width - 80)
+    usable_height = max(320, screen_height - 90)
+
+    window_height = min(760, usable_height)
+    target_width = max(420, min(520, int(round(window_height * 0.72))))
+    window_width = min(target_width, usable_width)
+    min_width = min(window_width, 360)
+    min_height = min(window_height, 420)
+    left = max(20, int(round((screen_width - window_width) / 2)))
+    top = max(32, int(round((screen_height - window_height) / 2)))
+    ui_scale = max(0.5, min(0.7, window_height / DEFAULT_WINDOW_HEIGHT))
+    return window_width, window_height, min_width, min_height, left, top, ui_scale
 
 
 class DownloadCancelled(Exception):
@@ -2006,37 +2074,43 @@ class YtdlFletApp:
             except Exception:
                 pass
 
-        # Target an on-screen size of 895x1425 physical pixels. Flet/Flutter sizes
-        # windows in logical pixels, so divide by the display scale (e.g. 150%)
-        # otherwise the window renders much larger than intended on HiDPI screens.
-        # On smaller (e.g. HD) screens, shrink window + UI proportionally to fit.
-        scale_factor = dpi_scale()
-        phys_w = DEFAULT_WINDOW_WIDTH
-        phys_h = DEFAULT_WINDOW_HEIGHT
-        self.ui_scale = 1.0
         work_area = screen_work_area()
-        if work_area is not None:
-            avail_w, avail_h = work_area
-            fit = min(1.0, (avail_w - 20) / phys_w, (avail_h - 60) / phys_h)
-            fit = max(0.5, fit)
-            self.ui_scale = fit
-            phys_w = int(phys_w * fit)
-            phys_h = int(phys_h * fit)
-        # Preserve the original tall composition on a typical MacBook display.
-        if is_packaged_app() and sys.platform == "darwin":
-            mac_fit = min(1.0, 900 / DEFAULT_WINDOW_HEIGHT)
-            phys_w = int(DEFAULT_WINDOW_WIDTH * mac_fit)
-            phys_h = int(DEFAULT_WINDOW_HEIGHT * mac_fit)
-            self.ui_scale = min(self.ui_scale, mac_fit)
-        win_w = max(1, int(round(phys_w / scale_factor)))
-        win_h = max(1, int(round(phys_h / scale_factor)))
-        min_w = int(win_w * 0.6)
-        min_h = int(win_h * 0.6)
+        window_position: tuple[int, int] | None = None
+        if sys.platform == "darwin":
+            mac_screen = work_area or (1440, 900)
+            win_w, win_h, min_w, min_h, left, top, self.ui_scale = macos_window_geometry(
+                mac_screen
+            )
+            window_position = (left, top)
+            startup_log(
+                f"macOS screen={mac_screen[0]}x{mac_screen[1]} "
+                f"safe_window={win_w}x{win_h} position={left},{top}"
+            )
+        else:
+            # Target an on-screen size of 895x1425 physical pixels. Flet/Flutter
+            # sizes windows in logical pixels, so divide by the display scale.
+            scale_factor = dpi_scale()
+            phys_w = DEFAULT_WINDOW_WIDTH
+            phys_h = DEFAULT_WINDOW_HEIGHT
+            self.ui_scale = 1.0
+            if work_area is not None:
+                avail_w, avail_h = work_area
+                fit = min(1.0, (avail_w - 20) / phys_w, (avail_h - 60) / phys_h)
+                fit = max(0.5, fit)
+                self.ui_scale = fit
+                phys_w = int(phys_w * fit)
+                phys_h = int(phys_h * fit)
+            win_w = max(1, int(round(phys_w / scale_factor)))
+            win_h = max(1, int(round(phys_h / scale_factor)))
+            min_w = int(win_w * 0.6)
+            min_h = int(win_h * 0.6)
         if hasattr(self.page, "window"):
             self.page.window.width = win_w
             self.page.window.height = win_h
             self.page.window.min_width = min_w
             self.page.window.min_height = min_h
+            if window_position is not None:
+                self.page.window.left, self.page.window.top = window_position
             try:
                 self.page.window.visible = True
             except Exception:
