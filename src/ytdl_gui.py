@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import importlib
 import json
+import locale
 import os
 import queue
 import re
@@ -13,6 +15,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import webbrowser
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -137,6 +140,22 @@ def app_icon_png_path() -> Path:
     return root / "pic" / "YTDL_LOGO.png"
 
 
+def support_image_path(filename: str) -> Path:
+    root = resource_root()
+    for relative in (f"pic/{filename}", f"assets/{filename}", filename):
+        path = root / relative
+        if path.is_file():
+            return path
+    return root / "pic" / filename
+
+
+def png_data_uri(path: Path) -> str:
+    try:
+        return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+    except Exception:
+        return ""
+
+
 # Kept for compatibility with older code paths / packaging tools.
 BACKGROUND_IMAGE = background_image_path()
 BACKGROUND_SVG = background_svg_path()
@@ -146,11 +165,219 @@ CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 # Local app version. Bump this when you publish a matching GitHub Release tag
 # (tag "v1.0.1" or "1.0.1" both compare as 1.0.1).
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 # GitHub "owner/repo" used for Releases update check.
 # Leave empty to disable. Example: "yourname/YTDL"
 # Override at runtime with env var YTDL_GITHUB_REPO if needed.
 GITHUB_REPO = (os.environ.get("YTDL_GITHUB_REPO") or "WiKiVibe/YTDL").strip()
+WIKIVIBE_URL = "https://portaly.cc/WiKiVibe"
+
+LANGUAGE_AUTO = "auto"
+LANGUAGE_ZH = "zh"
+LANGUAGE_EN = "en"
+_ACTIVE_LANGUAGE = LANGUAGE_EN
+
+EN_TEXT = {
+    "自動（建議）": "Auto (recommended)",
+    "關閉": "Off",
+    "使用內建 Deno JavaScript runtime。": "Using bundled Deno runtime.",
+    "未找到 Deno JavaScript runtime，YouTube 可能要求登入驗證。": "Deno runtime not found. YouTube may require sign-in verification.",
+    "使用 Cookies 檔案：{cookie_file}": "Using cookie file: {cookie_file}",
+    "使用 {label} 瀏覽器 Cookies。": "Using cookies from {label}.",
+    "下載失敗：YouTube 登入驗證被擋。請重新執行 install.bat 確認 Deno 已安裝完成，或稍後換網路再試。": "Download failed: YouTube sign-in verification was blocked. Run the installer again to check Deno, or try another network later.",
+    "下載失敗：YouTube 驗證資料被鎖住。請關閉瀏覽器背景程序後再試；程式會優先使用 Deno，不需要手動選 Cookies。": "Download failed: Browser cookie data is locked. Close all browser processes and try again. The app will use Deno first, so you do not need to select cookies manually.",
+    "下載失敗：YouTube 要求登入或驗證。請重新執行 install.bat 確認 Deno 已安裝完成，或稍後換網路再試。": "Download failed: YouTube requires sign-in or verification. Run the installer again to check Deno, or try another network later.",
+    "下載失敗：{error}": "Download failed: {error}",
+    "{client} 仍被 YouTube 擋，改試下一個。": "{client} is still blocked by YouTube; trying the next client.",
+    "{label} Cookies 無法通過 YouTube 驗證，改試下一個瀏覽器。": "Cookies from {label} did not pass YouTube verification; trying the next browser.",
+    "未命名影片": "Untitled video",
+    "警告：{message}": "Warning: {message}",
+    "錯誤：{message}": "Error: {message}",
+    "視訊": "Video",
+    "音訊": "Audio",
+    "{prefix}已下載 {downloaded}": "{prefix}Downloaded {downloaded}",
+    "串流完成，準備下一段…": "Stream complete. Preparing the next part...",
+    "後處理": "Post-processing",
+    "{name} 處理中...": "{name} in progress...",
+    "{name} 完成": "{name} complete",
+    "下載中 {index}/{total}：{title}": "Downloading {index}/{total}: {title}",
+    "開始下載：{title}": "Starting download: {title}",
+    "完成：{total} 個項目": "Items completed: {total}",
+    "下載已停止。": "Download stopped.",
+    "下載失敗：{message}": "Download failed: {message}",
+    "已啟用：下載頻道主 CC 字幕（不含 YouTube 自動字幕）。": "Creator-provided captions enabled. Auto-generated captions are excluded.",
+    "找不到 FFmpeg，無法轉碼。": "FFmpeg not found. Transcoding is unavailable.",
+    "4K H.264：先下載 4K 原始串流，再轉碼成 4K H.264 MP4。": "4K H.264: Downloading the original 4K stream, then converting to H.264 MP4.",
+    "下載完成，但找不到要轉碼的原始檔。": "Download finished, but the source file for transcoding was not found.",
+    "原始暫存檔無法刪除，可手動移除：{path}": "The temporary source could not be deleted; remove it manually: {path}",
+    "偵測到 NVIDIA 顯示卡，使用 NVENC 轉碼。": "NVIDIA GPU detected. Transcoding with NVENC.",
+    "NVENC 轉碼失敗，改用 CPU：{message}": "NVENC failed. Switching to CPU: {message}",
+    "使用 CPU libx264 轉碼。": "Transcoding with CPU (libx264).",
+    "找不到 FFmpeg。": "FFmpeg not found.",
+    "正在轉碼成 4K H.264 MP4...": "Transcoding to 4K H.264 MP4...",
+    "轉碼準備中…": "Preparing transcoding...",
+    "轉碼中 {percent:5.1f}%": "Transcoding {percent:5.1f}%",
+    "轉碼完成": "Transcoding complete",
+    "FFmpeg 失敗，代碼 {code}": "FFmpeg failed with code {code}",
+    "已輸出：{path}": "Output: {path}",
+    "正在更新核心...": "Updating download engine...",
+    "核心": "download engine",
+    "UI 更新發生問題：{message}": "UI update error: {message}",
+    "載入必要元件失敗：{message}": "Failed to load required components: {message}",
+    "就緒": "Ready",
+    "正在準備核心...": "Preparing download engine...",
+    "必要元件載入失敗，請重新執行 install.bat": "Required components failed to load. Run the installer again.",
+    "版本檢查：已是最新（目前 {current}，遠端 {remote}）。": "Version check: up to date (current {current}, remote {remote}).",
+    "有新版本可用：{remote}（目前 {current}）。請到 GitHub Releases 下載更新。": "A new version is available: {remote} (current {current}). Download it from GitHub Releases.",
+    "下載頁：{url}": "Download page: {url}",
+    "版本檢查略過：{message}": "Version check skipped: {message}",
+    "就緒，正在更新核心...": "Ready. Updating download engine...",
+    "自動更新完成。": "Download engine updated.",
+    "自動更新未完成，將嘗試使用目前版本。": "Update incomplete. Using the current download engine.",
+    "自動更新逾時，將嘗試使用目前版本。": "Update timed out. Using the current download engine.",
+    "自動更新發生問題：{message}": "Download engine update failed: {message}",
+    "返回": "Back",
+    "設定": "Settings",
+    "支持 WiKiVibe": "Support WiKiVibe",
+    "請先貼上網址": "Paste a URL first.",
+    "核心正在準備，請稍候": "The download engine is still preparing. Please wait.",
+    "正在分析網址...": "Analyzing URL...",
+    "剪貼簿沒有可貼上的文字": "The clipboard does not contain text to paste.",
+    "貼上": "Paste",
+    "送出": "Continue",
+    "請稍候一下": "Just a moment",
+    "核心尚未載入": "The download engine is not ready yet.",
+    "正在分析：{url}": "Analyzing: {url}",
+    "核心沒有回傳影片資訊": "No video information was found.",
+    "分析失敗：{url}：{message}": "Analysis failed for {url}: {message}",
+    "核心分析階段沒有回傳清單": "No items were found during analysis.",
+    "分析階段未取得清單，改用原始網址繼續：{detail}": "No items were found. Continuing with the original URL: {detail}",
+    "已保留原始網址": "Using original URL",
+    "網址不是有效的下載連結": "The URL is not a valid download link.",
+    "沒有找到可下載的影片：{detail}": "No downloadable videos found: {detail}",
+    "已分析完成：{count} 個項目。": "Items found: {count}.",
+    "分析完成": "Analysis complete",
+    "分析失敗：{message}": "Analysis failed: {message}",
+    "請至少選一個項目": "Select at least one item.",
+    "選擇要下載的項目": "Select items to download",
+    "偵測到播放清單或多個項目，先勾選你要的影片。": "Multiple videos detected. Select what you want to download.",
+    "下一步": "Next",
+    "影像 + 聲音": "Video + audio",
+    "下載影片，保留最佳可用音訊。": "Download video with best available audio.",
+    "只有聲音": "Audio only",
+    "輸出 WAV、MP3 或 AAC。": "Export as WAV, MP3, or AAC.",
+    "懶人首選：4K 最佳畫質轉 H.264、音訊 320k AAC，輸出 MP4。": "Recommended: best available 4K quality, converted to H.264 with 320 kbps AAC in MP4.",
+    "【AV1】畫質、壓縮效率高，舊設備可能無法播放。": "AV1 offers excellent quality at smaller file sizes, but may not play on older devices.",
+    "【H.264】1080P，速度與大小較平衡。": "H.264 at 1080p balances speed and file size.",
+    "進階編碼選項": "Advanced codec options",
+    "相容性最好。": "Best compatibility.",
+    "壓縮效率高。": "High compression efficiency.",
+    "下載頻道主 CC 字幕（不含 YouTube 自動字幕）": "Creator-provided captions only (no auto-generated captions)",
+    "選擇畫質": "Video quality",
+    "一般直接選 AUTO；需要指定 4K 或 HD 時再切換。": "Use AUTO for most downloads; choose 4K or HD only when needed.",
+    "開始下載": "Start download",
+    "不壓縮容器，檔案最大；來源仍受 YouTube 音源限制。": "Uncompressed audio with the largest file size. Quality is still limited by YouTube's source audio.",
+    "相容性最好，強制目標 320k。": "Best compatibility. Targets 320 kbps.",
+    "輸出為常見 m4a/AAC，強制目標 320k。": "Standard M4A/AAC output. Targets 320 kbps.",
+    "選擇聲音格式": "Audio format",
+    "MP3 與 AAC 會用 320k 目標輸出。": "MP3 and AAC target 320 kbps.",
+    "開始轉檔": "Start conversion",
+    "影片：{quality} / {codec}": "Video: {quality} / {codec}",
+    "聲音：{format}": "Audio: {format}",
+    "即將處理": "Ready",
+    "{count} 個項目": "Selected: {count}",
+    "字幕：頻道主 CC（不含自動字幕）": "Captions: creator-provided only",
+    "儲存到：{path}": "Save to: {path}",
+    "選擇儲存資料夾": "Choose output folder",
+    "目前環境無法選擇資料夾：{message}": "Unable to choose a folder in this environment: {message}",
+    "已更新儲存位置": "Output location updated",
+    "已改回下載資料夾": "Reset to Downloads",
+    "儲存位置": "Output location",
+    "選擇資料夾": "Choose folder",
+    "改回下載資料夾": "Reset to Downloads",
+    "完成後自動開啟資料夾": "Open folder when finished",
+    "4K H.264 完成後刪除原始暫存檔": "Delete temporary source after 4K H.264 conversion",
+    "偵測到 NVIDIA 時優先使用 NVENC": "Use NVENC with NVIDIA GPUs",
+    "語言": "Language",
+    "自動（依系統）": "Auto (system)",
+    "中文": "Chinese",
+    "英文": "English",
+    "核心尚未準備完成": "The download engine is not ready yet.",
+    "沒有可下載的項目": "There are no downloadable items.",
+    "準備中...": "Preparing...",
+    "停止": "Stop",
+    "完成": "Done",
+    "已完成，點中間的播放鍵可直接開啟檔案。": "Done. Click the play button to open the file.",
+    "開啟檔案": "Open file",
+    "請查看記錄或重新嘗試。": "Check the log or try again.",
+    "開資料夾": "Open folder",
+    "回到首頁": "Home",
+    "無法開啟檔案：{message}": "Unable to open file: {message}",
+    "正在停止...": "Stopping...",
+    "無法開啟資料夾：{message}": "Unable to open folder: {message}",
+}
+
+
+def tr(text: str, **values: Any) -> str:
+    template = EN_TEXT.get(text, text) if _ACTIVE_LANGUAGE == LANGUAGE_EN else text
+    try:
+        return template.format(**values)
+    except (KeyError, ValueError):
+        return template
+
+
+def detect_system_language() -> str:
+    candidates: list[str] = []
+    for key in ("LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"):
+        value = (os.environ.get(key) or "").strip()
+        if value:
+            candidates.append(value)
+    try:
+        locale_name = locale.getlocale()[0]
+        if locale_name:
+            candidates.append(locale_name)
+    except Exception:
+        pass
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            buffer = ctypes.create_unicode_buffer(85)
+            if ctypes.windll.kernel32.GetUserDefaultLocaleName(buffer, len(buffer)):
+                candidates.append(buffer.value)
+        except Exception:
+            pass
+    elif sys.platform == "darwin":
+        try:
+            result = subprocess.run(
+                ["defaults", "read", "-g", "AppleLocale"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+            if result.stdout.strip():
+                candidates.append(result.stdout.strip())
+        except Exception:
+            pass
+    for candidate in candidates:
+        normalized = candidate.strip().lower().replace("_", "-")
+        if normalized == "zh" or normalized.startswith("zh-"):
+            return LANGUAGE_ZH
+    return LANGUAGE_EN
+
+
+def resolve_language(preference: str) -> str:
+    normalized = (preference or LANGUAGE_AUTO).strip().lower()
+    if normalized in (LANGUAGE_ZH, LANGUAGE_EN):
+        return normalized
+    return detect_system_language()
+
+
+def set_active_language(preference: str) -> str:
+    global _ACTIVE_LANGUAGE
+    _ACTIVE_LANGUAGE = resolve_language(preference)
+    return _ACTIVE_LANGUAGE
 
 VIDEO_QUALITIES = ("AUTO", "4K", "HD")
 VIDEO_CODECS = ("AUTO", "H264", "AV1")
@@ -306,9 +533,9 @@ def apply_js_runtime_options(options: dict[str, Any], log: Callable[[str], None]
         options["js_runtimes"] = {"deno": {"path": str(deno)}}
         options["remote_components"] = ["ejs:github"]
         if log:
-            log("使用內建 Deno JavaScript runtime。")
+            log(tr("使用內建 Deno JavaScript runtime。"))
     elif log:
-        log("未找到 Deno JavaScript runtime，YouTube 可能要求登入驗證。")
+        log(tr("未找到 Deno JavaScript runtime，YouTube 可能要求登入驗證。"))
 
 
 def enable_high_dpi() -> None:
@@ -386,6 +613,7 @@ class VideoItem:
 @dataclass
 class Settings:
     output_dir: str
+    language: str = LANGUAGE_AUTO
     default_video_quality: str = "AUTO"
     default_video_codec: str = "AUTO"
     default_audio_format: str = "MP3"
@@ -465,6 +693,8 @@ def load_settings() -> Settings:
             setattr(settings, key, value)
     if not settings.output_dir:
         settings.output_dir = str(get_downloads_dir())
+    if settings.language not in (LANGUAGE_AUTO, LANGUAGE_ZH, LANGUAGE_EN):
+        settings.language = LANGUAGE_AUTO
     # Browser-cookie controls were removed from the UI. Old settings must not
     # keep forcing Chrome/Brave cookies and reintroduce database-lock errors.
     settings.cookie_browser = "OFF"
@@ -569,7 +799,7 @@ def apply_cookie_file(
         return False
     options["cookiefile"] = cookie_file
     if log:
-        log(f"使用 Cookies 檔案：{cookie_file}")
+        log(tr("使用 Cookies 檔案：{cookie_file}", cookie_file=cookie_file))
     return True
 
 
@@ -583,7 +813,7 @@ def apply_cookie_options_for_browser(
     options["cookiesfrombrowser"] = (browser, None, None, None)
     if log:
         label = COOKIE_BROWSER_LABELS.get(browser, browser)
-        log(f"使用 {label} 瀏覽器 Cookies。")
+        log(tr("使用 {label} 瀏覽器 Cookies。", label=tr(label)))
 
 
 def apply_cookie_options(
@@ -661,21 +891,18 @@ def short_error(text: str, limit: int = 140) -> str:
 def friendly_error_message(error: Any) -> str:
     message = str(error)
     if is_cookie_decrypt_error(error):
-        return (
-            "下載失敗：YouTube 登入驗證被擋。"
-            "請重新執行 install.bat 確認 Deno 已安裝完成，或稍後換網路再試。"
+        return tr(
+            "下載失敗：YouTube 登入驗證被擋。請重新執行 install.bat 確認 Deno 已安裝完成，或稍後換網路再試。"
         )
     if is_cookie_database_error(error):
-        return (
-            "下載失敗：YouTube 驗證資料被鎖住。"
-            "請關閉瀏覽器背景程序後再試；程式會優先使用 Deno，不需要手動選 Cookies。"
+        return tr(
+            "下載失敗：YouTube 驗證資料被鎖住。請關閉瀏覽器背景程序後再試；程式會優先使用 Deno，不需要手動選 Cookies。"
         )
     if is_cookie_auth_error(error):
-        return (
-            "下載失敗：YouTube 要求登入或驗證。"
-            "請重新執行 install.bat 確認 Deno 已安裝完成，或稍後換網路再試。"
+        return tr(
+            "下載失敗：YouTube 要求登入或驗證。請重新執行 install.bat 確認 Deno 已安裝完成，或稍後換網路再試。"
         )
-    return f"下載失敗：{short_error(message, 180)}"
+    return tr("下載失敗：{error}", error=short_error(message, 180))
 
 
 def is_cookie_decrypt_error(error: Any) -> bool:
@@ -743,7 +970,7 @@ def extract_info_with_cookie_fallback(
                     raise
                 break
             if client is not None:
-                log(f"player_client={client} 仍被 YouTube 擋，改試下一個。")
+                log(tr("{client} 仍被 YouTube 擋，改試下一個。", client=f"player_client={client}"))
 
     # Step 2: fall back to browser cookies (for the minority still blocked).
     candidates = cookie_browser_candidates(settings.cookie_browser)
@@ -770,7 +997,7 @@ def extract_info_with_cookie_fallback(
             if not should_try_next:
                 raise
             label = COOKIE_BROWSER_LABELS.get(browser, browser)
-            log(f"{label} Cookies 無法通過 YouTube 驗證，改試下一個瀏覽器。")
+            log(tr("{label} Cookies 無法通過 YouTube 驗證，改試下一個瀏覽器。", label=tr(label)))
 
     if last_exc:
         raise last_exc
@@ -800,7 +1027,7 @@ def flatten_info(info: dict[str, Any], source_url: str) -> list[VideoItem]:
         for entry in entries:
             if not entry:
                 continue
-            title = entry.get("title") or entry.get("id") or "未命名影片"
+            title = entry.get("title") or entry.get("id") or tr("未命名影片")
             items.append(
                 VideoItem(
                     title=str(title),
@@ -1056,11 +1283,11 @@ class QueueLogger:
 
     def warning(self, msg: str) -> None:
         if msg:
-            self.emit("log", f"警告：{msg}")
+            self.emit("log", tr("警告：{message}", message=msg))
 
     def error(self, msg: str) -> None:
         if msg:
-            self.emit("log", f"錯誤：{msg}")
+            self.emit("log", tr("錯誤：{message}", message=msg))
 
 
 def apply_manual_subtitle_options(options: dict[str, Any], download_manual_subs: bool) -> None:
@@ -1121,7 +1348,7 @@ def build_download_options(
 
     def _stream_label(idx: int) -> str:
         if video_two_stream:
-            return "視訊" if idx == 0 else "音訊"
+            return tr("視訊") if idx == 0 else tr("音訊")
         return ""
 
     def _emit_item_percent(item_percent: float, detail: str) -> None:
@@ -1203,7 +1430,7 @@ def build_download_options(
                 emit(
                     "progress",
                     -1.0,
-                    f"{prefix}已下載 {format_bytes(downloaded)}",
+                    tr("{prefix}已下載 {downloaded}", prefix=prefix, downloaded=format_bytes(downloaded)),
                     "download",
                 )
         elif status == "finished":
@@ -1216,17 +1443,17 @@ def build_download_options(
                 tracker["item_done_bytes"] = max(
                     tracker["item_done_bytes"], tracker["item_total_bytes_seen"]
                 )
-            emit("progress", -1.0, "串流完成，準備下一段…", "download")
+            emit("progress", -1.0, tr("串流完成，準備下一段…"), "download")
 
     def postprocessor_hook(data: dict[str, Any]) -> None:
         if cancel_event.is_set():
             raise DownloadCancelled()
-        pp = data.get("postprocessor") or "後處理"
+        pp = data.get("postprocessor") or tr("後處理")
         status = data.get("status")
         if status == "started":
-            emit("status", f"{pp} 處理中...")
+            emit("status", tr("{name} 處理中...", name=pp))
         elif status == "finished":
-            emit("status", f"{pp} 完成")
+            emit("status", tr("{name} 完成", name=pp))
 
     suffix = "_YTDL_source" if source_for_transcode else "_YTDL"
     options: dict[str, Any] = {
@@ -1351,8 +1578,8 @@ class DownloadJob:
                 if self.cancel_event.is_set():
                     raise DownloadCancelled()
                 self._reset_item_progress(index, total)
-                self.emit("status", f"下載中 {index}/{total}：{item.title}")
-                self.emit("log", f"開始下載：{item.title}")
+                self.emit("status", tr("下載中 {index}/{total}：{title}", index=index, total=total, title=item.title))
+                self.emit("log", tr("開始下載：{title}", title=item.title))
                 if transcode_4k_h264:
                     self.download_then_transcode(item)
                 else:
@@ -1364,11 +1591,11 @@ class DownloadJob:
                 self.emit("progress", bracket_end, f"{bracket_end:.0f}%", "download")
             self.emit("progress", 100.0, "100%", "download")
             done_path = str(self.last_file) if self.last_file else None
-            self.emit("done", True, f"完成：{total} 個項目", done_path)
+            self.emit("done", True, tr("完成：{total} 個項目", total=total), done_path)
         except DownloadCancelled:
-            self.emit("done", False, "下載已停止。", None)
+            self.emit("done", False, tr("下載已停止。"), None)
         except Exception as exc:
-            self.emit("log", f"下載失敗：{exc}")
+            self.emit("log", tr("下載失敗：{message}", message=exc))
             self.emit("done", False, friendly_error_message(exc), None)
 
     def download_direct(self, item: VideoItem) -> None:
@@ -1387,7 +1614,7 @@ class DownloadJob:
             download_manual_subs=self.download_manual_subs,
         )
         if self.download_manual_subs:
-            self.emit("log", "已啟用：下載頻道主 CC 字幕（不含 YouTube 自動字幕）。")
+            self.emit("log", tr("已啟用：下載頻道主 CC 字幕（不含 YouTube 自動字幕）。"))
         info = extract_info_with_cookie_fallback(
             yt_dlp=self.yt_dlp,
             base_options=options,
@@ -1404,9 +1631,9 @@ class DownloadJob:
 
     def download_then_transcode(self, item: VideoItem) -> None:
         if not self.ffmpeg_path:
-            raise RuntimeError("找不到 FFmpeg，無法轉碼。")
+            raise RuntimeError(tr("找不到 FFmpeg，無法轉碼。"))
 
-        self.emit("log", "4K H.264：先下載 4K 原始串流，再轉碼成 4K H.264 MP4。")
+        self.emit("log", tr("4K H.264：先下載 4K 原始串流，再轉碼成 4K H.264 MP4。"))
         options = build_download_options(
             output_dir=self.output_dir,
             ffmpeg_path=self.ffmpeg_path,
@@ -1423,7 +1650,7 @@ class DownloadJob:
             download_manual_subs=self.download_manual_subs,
         )
         if self.download_manual_subs:
-            self.emit("log", "已啟用：下載頻道主 CC 字幕（不含 YouTube 自動字幕）。")
+            self.emit("log", tr("已啟用：下載頻道主 CC 字幕（不含 YouTube 自動字幕）。"))
         info = extract_info_with_cookie_fallback(
             yt_dlp=self.yt_dlp,
             base_options=options,
@@ -1435,7 +1662,7 @@ class DownloadJob:
 
         source_path = find_downloaded_filepath(info or {}, self.output_dir, source_for_transcode=True)
         if not source_path:
-            raise RuntimeError("下載完成，但找不到要轉碼的原始檔。")
+            raise RuntimeError(tr("下載完成，但找不到要轉碼的原始檔。"))
 
         output_path = unique_path(final_h264_path(source_path))
         duration = None
@@ -1451,7 +1678,7 @@ class DownloadJob:
             try:
                 source_path.unlink()
             except OSError:
-                self.emit("log", f"原始暫存檔無法刪除，可手動移除：{source_path}")
+                self.emit("log", tr("原始暫存檔無法刪除，可手動移除：{path}", path=source_path))
 
     def nvenc_available(self) -> bool:
         if self.nvenc_available_cache is not None:
@@ -1466,7 +1693,7 @@ class DownloadJob:
 
     def transcode_to_h264(self, source_path: Path, output_path: Path, duration: float | None) -> None:
         if self.nvenc_available():
-            self.emit("log", "偵測到 NVIDIA 顯示卡，使用 NVENC 轉碼。")
+            self.emit("log", tr("偵測到 NVIDIA 顯示卡，使用 NVENC 轉碼。"))
             nvenc_args = [
                 "-c:v",
                 "h264_nvenc",
@@ -1489,13 +1716,13 @@ class DownloadJob:
                 self.run_ffmpeg_transcode(source_path, output_path, nvenc_args, duration)
                 return
             except Exception as exc:
-                self.emit("log", f"NVENC 轉碼失敗，改用 CPU：{exc}")
+                self.emit("log", tr("NVENC 轉碼失敗，改用 CPU：{message}", message=exc))
                 try:
                     output_path.unlink(missing_ok=True)
                 except OSError:
                     pass
 
-        self.emit("log", "使用 CPU libx264 轉碼。")
+        self.emit("log", tr("使用 CPU libx264 轉碼。"))
         cpu_args = [
             "-c:v",
             "libx264",
@@ -1518,7 +1745,7 @@ class DownloadJob:
         duration: float | None,
     ) -> None:
         if not self.ffmpeg_path:
-            raise RuntimeError("找不到 FFmpeg。")
+            raise RuntimeError(tr("找不到 FFmpeg。"))
 
         command = [
             self.ffmpeg_path,
@@ -1545,11 +1772,11 @@ class DownloadJob:
             str(output_path),
         ]
 
-        self.emit("status", "正在轉碼成 4K H.264 MP4...")
+        self.emit("status", tr("正在轉碼成 4K H.264 MP4..."))
         # Reset to 0% for the new (transcode) stage and let ffmpeg drive it
         # honestly from there. The expanded out_time parser handles every
         # ffmpeg build, so the bar shouldn't stick at 0% for long.
-        self.emit("progress", 0.0, "轉碼準備中…", "transcode")
+        self.emit("progress", 0.0, tr("轉碼準備中…"), "transcode")
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -1572,9 +1799,9 @@ class DownloadJob:
                     last_output = last_output[-8:]
                 percent = ffmpeg_progress_percent(line, duration)
                 if percent is not None:
-                    self.emit("progress", percent, f"轉碼中 {percent:5.1f}%", "transcode")
+                    self.emit("progress", percent, tr("轉碼中 {percent:5.1f}%", percent=percent), "transcode")
                 elif line == "progress=end":
-                    self.emit("progress", 100.0, "轉碼完成", "transcode")
+                    self.emit("progress", 100.0, tr("轉碼完成"), "transcode")
             return_code = process.wait()
         finally:
             if process.poll() is None:
@@ -1582,10 +1809,10 @@ class DownloadJob:
 
         if return_code != 0:
             detail = "\n".join(last_output)
-            raise RuntimeError(detail or f"FFmpeg 失敗，代碼 {return_code}")
+            raise RuntimeError(detail or tr("FFmpeg 失敗，代碼 {code}", code=return_code))
 
-        self.emit("progress", 100.0, "轉碼完成", "transcode")
-        self.emit("log", f"已輸出：{output_path}")
+        self.emit("progress", 100.0, tr("轉碼完成"), "transcode")
+        self.emit("log", tr("已輸出：{path}", path=output_path))
 
 
 def icon(name: str) -> Any:
@@ -1691,11 +1918,12 @@ class YtdlFletApp:
     def __init__(self, page: ft.Page) -> None:
         self.page = page
         self.state = AppState(settings=load_settings())
+        self.language = set_active_language(self.state.settings.language)
         self.state.video_quality = self.state.settings.default_video_quality
         self.state.video_codec = self.state.settings.default_video_codec
         self.state.audio_format = self.state.settings.default_audio_format
         self.history: list[str] = []
-        self.status_text = "正在更新核心..."
+        self.status_text = tr("正在更新核心...")
         self.notice_text = ""
         self.log_lines: list[str] = []
         self.current_job: DownloadJob | None = None
@@ -1915,7 +2143,7 @@ class YtdlFletApp:
             try:
                 self.flush_ui_events()
             except Exception as exc:
-                self.log(f"UI 更新發生問題：{exc}")
+                self.log(tr("UI 更新發生問題：{message}", message=exc))
             await asyncio.sleep(0.05)
 
     def flush_ui_events(self) -> None:
@@ -1982,15 +2210,15 @@ class YtdlFletApp:
             return True
         except Exception as exc:
             self.state.ready = False
-            self.log(f"載入必要元件失敗：{exc}")
+            self.log(tr("載入必要元件失敗：{message}", message=exc))
             return False
 
     def startup_worker(self) -> None:
         core_ready = self.load_core()
         if core_ready:
-            self.set_status("就緒")
+            self.set_status(tr("就緒"))
         else:
-            self.set_status("正在準備核心...")
+            self.set_status(tr("正在準備核心..."))
 
         if getattr(sys, "frozen", False):
             self.check_github_release_update()
@@ -2003,10 +2231,10 @@ class YtdlFletApp:
             self.load_core()
         if self.state.yt_dlp is not None:
             self.state.ready = True
-            self.set_status("就緒")
+            self.set_status(tr("就緒"))
         else:
             self.state.ready = False
-            self.set_status("必要元件載入失敗，請重新執行 install.bat")
+            self.set_status(tr("必要元件載入失敗，請重新執行 install.bat"))
         # Non-blocking for the UI thread (we are already in a background worker).
         self.check_github_release_update()
         self.safe_update()
@@ -2022,23 +2250,20 @@ class YtdlFletApp:
                 return
             remote_tag = latest["tag"]
             if not is_remote_version_newer(remote_tag, APP_VERSION):
-                self.log(f"版本檢查：已是最新（目前 {APP_VERSION}，遠端 {remote_tag}）。")
+                self.log(tr("版本檢查：已是最新（目前 {current}，遠端 {remote}）。", current=APP_VERSION, remote=remote_tag))
                 return
-            message = (
-                f"有新版本可用：{remote_tag}（目前 {APP_VERSION}）。"
-                f"請到 GitHub Releases 下載更新。"
-            )
+            message = tr("有新版本可用：{remote}（目前 {current}）。請到 GitHub Releases 下載更新。", remote=remote_tag, current=APP_VERSION)
             self.log(message)
-            self.log(f"下載頁：{latest['url']}")
+            self.log(tr("下載頁：{url}", url=latest["url"]))
             self.toast(message)
         except Exception as exc:
-            self.log(f"版本檢查略過：{exc}")
+            self.log(tr("版本檢查略過：{message}", message=exc))
 
     def auto_update_worker(self) -> None:
         if self.state.yt_dlp is not None:
-            self.set_status("就緒，正在更新核心...")
+            self.set_status(tr("就緒，正在更新核心..."))
         else:
-            self.set_status("正在更新核心...")
+            self.set_status(tr("正在更新核心..."))
         cmd = [
             sys.executable,
             "-m",
@@ -2064,18 +2289,18 @@ class YtdlFletApp:
                 creationflags=CREATE_NO_WINDOW,
             )
             if result.returncode == 0:
-                self.log("自動更新完成。")
+                self.log(tr("自動更新完成。"))
             else:
-                self.log("自動更新未完成，將嘗試使用目前版本。")
+                self.log(tr("自動更新未完成，將嘗試使用目前版本。"))
                 trimmed = "\n".join((result.stdout or "").splitlines()[-8:])
                 if trimmed:
                     self.log(trimmed)
         except subprocess.TimeoutExpired:
-            self.log("自動更新逾時，將嘗試使用目前版本。")
+            self.log(tr("自動更新逾時，將嘗試使用目前版本。"))
         except Exception as exc:
-            self.log(f"自動更新發生問題：{exc}")
+            self.log(tr("自動更新發生問題：{message}", message=exc))
         if self.state.yt_dlp is not None:
-            self.set_status("就緒")
+            self.set_status(tr("就緒"))
 
     def safe_update(self) -> None:
         if not self.in_ui_thread():
@@ -2103,7 +2328,8 @@ class YtdlFletApp:
     def public_status_text(self, text: str) -> str:
         if not text:
             return ""
-        return text.replace("yt-dlp", "核心").replace("Yt-dlp", "核心")
+        core_label = tr("核心")
+        return text.replace("yt-dlp", core_label).replace("Yt-dlp", core_label)
 
     def set_status(self, text: str) -> None:
         if not self.in_ui_thread():
@@ -2173,6 +2399,65 @@ class YtdlFletApp:
         else:
             self.render("url", replace=True)
 
+    def sponsor_controls(self) -> tuple[ft.Control, ft.Control]:
+        icon_size = max(19, int(24 * self.ui_scale * 0.8))
+        qr_size = max(138, int(178 * self.ui_scale * 0.85))
+        bubble_src = png_data_uri(support_image_path("Bubble-tea.png"))
+        qr_src = png_data_uri(support_image_path("portaly_wikivibe.png"))
+        qr_popup = ft.Container(
+            content=(
+                ft.Image(src=qr_src, width=qr_size, height=qr_size, fit=ft.BoxFit.CONTAIN)
+                if qr_src
+                else ft.Text("WiKiVibe", color="#111111", weight=ft.FontWeight.BOLD)
+            ),
+            width=qr_size + 16,
+            height=qr_size + 16,
+            padding=8,
+            bgcolor="#FFFFFF",
+            border=border_all(1, "#E5E7EB"),
+            border_radius=8,
+            shadow=glass_shadow(),
+            visible=False,
+            right=0,
+            bottom=self.sc(34),
+        )
+
+        def show_qr(event: Any) -> None:
+            qr_popup.visible = str(getattr(event, "data", "")).lower() in ("true", "1")
+            try:
+                qr_popup.update()
+            except Exception:
+                pass
+
+        def open_support(_event: Any = None) -> None:
+            try:
+                webbrowser.open_new_tab(WIKIVIBE_URL)
+            except Exception as exc:
+                self.toast(str(exc))
+
+        bubble_content: ft.Control
+        if bubble_src:
+            bubble_content = ft.Image(
+                src=bubble_src,
+                width=icon_size,
+                height=icon_size,
+                fit=ft.BoxFit.CONTAIN,
+            )
+        else:
+            bubble_content = ft.Icon(icon("FAVORITE"), size=icon_size, color=YT_RED)
+        bubble_button = ft.Container(
+            content=bubble_content,
+            width=icon_size + 6,
+            height=icon_size + 6,
+            alignment=align_center(),
+            border_radius=4,
+            tooltip=tr("支持 WiKiVibe"),
+            on_hover=show_qr,
+            on_click=open_support,
+            ink=True,
+        )
+        return bubble_button, qr_popup
+
     def app_shell(self, content: ft.Control) -> ft.Control:
         can_back = self.state.current_step not in ("url", "progress")
         footer_size = self.settings_note_size()
@@ -2184,12 +2469,13 @@ class YtdlFletApp:
         back_button = ft.IconButton(
             icon=icon("ARROW_BACK"),
             visible=can_back,
-            tooltip="返回",
+            tooltip=tr("返回"),
             icon_color=TEXT_SOFT,
             icon_size=17,
             on_click=self.back,
         )
         settings_visible = self.state.current_step != "settings"
+        sponsor_qr_popup: ft.Control = ft.Container(visible=False)
         bottom_bar = ft.Row(
             controls=[
                 ft.Row(
@@ -2204,7 +2490,7 @@ class YtdlFletApp:
                     icon=icon("SETTINGS"),
                     icon_color=TEXT_SOFT,
                     icon_size=17,
-                    tooltip="設定",
+                    tooltip=tr("設定"),
                     visible=settings_visible,
                     on_click=lambda _e: self.render("settings"),
                 ),
@@ -2214,17 +2500,25 @@ class YtdlFletApp:
         )
         if self.state.current_step == "settings":
             self.bottom_status_text = None
+            sponsor_button, sponsor_qr_popup = self.sponsor_controls()
             bottom_bar = ft.Row(
                 controls=[
                     ft.Row(
                         controls=[
                             ft.Text("●", size=footer_size, color=YT_RED),
-                            ft.Text("v1.0", size=footer_size, color=TEXT_MUTED),
+                            ft.Text(f"v{APP_VERSION}", size=footer_size, color=TEXT_MUTED),
                         ],
                         spacing=max(3, int(5 * self.ui_scale)),
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
-                    ft.Text("By WiKi", size=footer_size, color=TEXT_MUTED),
+                    ft.Row(
+                        controls=[
+                            ft.Text("By WiKiVibe", size=footer_size, color=TEXT_MUTED),
+                            sponsor_button,
+                        ],
+                        spacing=max(3, int(6 * self.ui_scale)),
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -2247,6 +2541,7 @@ class YtdlFletApp:
                     ),
                     ft.Container(content=back_button, left=0, top=0),
                     ft.Container(content=bottom_bar, left=0, right=0, bottom=0),
+                    sponsor_qr_popup,
                 ],
                 fit=ft.StackFit.EXPAND,
                 expand=True,
@@ -2313,7 +2608,7 @@ class YtdlFletApp:
         show_icon: bool = True,
     ) -> ft.Control:
         return ft.FilledButton(
-            content=text,
+            content=self.button_label(text, text_size, ft.FontWeight.BOLD),
             icon=icon("ARROW_FORWARD") if show_icon else None,
             disabled=disabled,
             on_click=on_click,
@@ -2341,7 +2636,7 @@ class YtdlFletApp:
         pad_y: int = 18,
     ) -> ft.Control:
         return ft.OutlinedButton(
-            content=text,
+            content=self.button_label(text, text_size, ft.FontWeight.BOLD),
             icon=leading_icon,
             on_click=on_click,
             width=width,
@@ -2354,6 +2649,21 @@ class YtdlFletApp:
                 padding=padding_symmetric(horizontal=pad_x, vertical=pad_y),
                 text_style=ft.TextStyle(size=text_size, weight=ft.FontWeight.BOLD),
             ),
+        )
+
+    def button_label(
+        self,
+        text: str,
+        size: int | None = None,
+        weight: ft.FontWeight | None = None,
+    ) -> ft.Text:
+        return ft.Text(
+            text,
+            size=size,
+            weight=weight,
+            max_lines=1,
+            no_wrap=True,
+            overflow=ft.TextOverflow.ELLIPSIS,
         )
 
     def option_tile(
@@ -2444,10 +2754,13 @@ class YtdlFletApp:
         compact_scale = compact_width / 300
         input_width = int(280 * compact_scale)
         input_height = max(40, int(46 * compact_scale))
-        button_width = max(80, int(92 * compact_scale))
-        button_height = max(30, int(32 * compact_scale))
         compact_text_size = max(10, int(12 * compact_scale))
         compact_spacing = max(8, int(11 * compact_scale))
+        button_width = min(
+            max(104, int(108 * compact_scale)),
+            (compact_width - compact_spacing) // 2,
+        )
+        button_height = max(34, int(36 * compact_scale))
         input_border = getattr(ft, "InputBorder", None)
         text_field_options: dict[str, Any] = {
             "hint_text": "https://www.youtube.com/watch?v=...",
@@ -2473,13 +2786,13 @@ class YtdlFletApp:
         def do_submit() -> None:
             urls = parse_input_urls(url_field.value or "")
             if not urls:
-                self.toast("請先貼上網址")
+                self.toast(tr("請先貼上網址"))
                 return
             if self.state.yt_dlp is None:
-                self.toast("核心正在準備，請稍候")
+                self.toast(tr("核心正在準備，請稍候"))
                 return
             self.state.urls = urls
-            self.render_loading("正在分析網址...")
+            self.render_loading(tr("正在分析網址..."))
             self.run_background(self.analyze_urls, urls)
 
         def submit(_event: Any = None) -> None:
@@ -2498,7 +2811,7 @@ class YtdlFletApp:
                 # Paste then submit immediately.
                 do_submit()
             else:
-                self.toast("剪貼簿沒有可貼上的文字")
+                self.toast(tr("剪貼簿沒有可貼上的文字"))
 
         url_field.on_submit = submit
 
@@ -2529,7 +2842,7 @@ class YtdlFletApp:
                 ft.Row(
                     controls=[
                         self.secondary_button(
-                            "貼上",
+                            tr("貼上"),
                             icon("CONTENT_PASTE"),
                             paste,
                             width=button_width,
@@ -2539,7 +2852,7 @@ class YtdlFletApp:
                             pad_y=4,
                         ),
                         self.primary_button(
-                            "送出",
+                            tr("送出"),
                             submit,
                             disabled=False,
                             width=button_width,
@@ -2582,7 +2895,7 @@ class YtdlFletApp:
                         ft.Container(expand=True),
                         ft.ProgressRing(width=92, height=92, stroke_width=8),
                         ft.Text(message, size=20, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
-                        ft.Text("請稍候一下", size=13, color=TEXT_MUTED, text_align=ft.TextAlign.CENTER),
+                        ft.Text(tr("請稍候一下"), size=13, color=TEXT_MUTED, text_align=ft.TextAlign.CENTER),
                         ft.Container(expand=True),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -2596,7 +2909,7 @@ class YtdlFletApp:
         try:
             yt_dlp = self.state.yt_dlp
             if yt_dlp is None:
-                raise RuntimeError("核心尚未載入")
+                raise RuntimeError(tr("核心尚未載入"))
             try:
                 YTDLP_CACHE_DIR.mkdir(parents=True, exist_ok=True)
             except Exception:
@@ -2613,7 +2926,7 @@ class YtdlFletApp:
             all_items: list[VideoItem] = []
             errors: list[str] = []
             for url in urls:
-                self.set_status(f"正在分析：{url}")
+                self.set_status(tr("正在分析：{url}", url=url))
                 try:
                     info = extract_info_with_cookie_fallback(
                         yt_dlp=yt_dlp,
@@ -2626,35 +2939,35 @@ class YtdlFletApp:
                     if info:
                         all_items.extend(flatten_info(info, url))
                     else:
-                        errors.append(f"{url}: 核心沒有回傳影片資訊")
+                        errors.append(f"{url}: {tr('核心沒有回傳影片資訊')}")
                 except Exception as exc:
                     errors.append(f"{url}: {exc}")
-                    self.log(f"分析失敗：{url}：{exc}")
+                    self.log(tr("分析失敗：{url}：{message}", url=url, message=exc))
             if not all_items:
                 fallback_items = fallback_items_from_urls(urls)
                 if fallback_items:
                     self.state.items = fallback_items
-                    detail = short_error(errors[0]) if errors else "核心分析階段沒有回傳清單"
-                    self.log(f"分析階段未取得清單，改用原始網址繼續：{detail}")
-                    self.set_status("已保留原始網址")
+                    detail = short_error(errors[0]) if errors else tr("核心分析階段沒有回傳清單")
+                    self.log(tr("分析階段未取得清單，改用原始網址繼續：{detail}", detail=detail))
+                    self.set_status(tr("已保留原始網址"))
                     if len(fallback_items) > 1:
                         self.render("select_items", replace=True)
                     else:
                         self.render("mode", replace=True)
                     return
-                detail = short_error(errors[0]) if errors else "網址不是有效的下載連結"
-                self.toast(f"沒有找到可下載的影片：{detail}")
+                detail = short_error(errors[0]) if errors else tr("網址不是有效的下載連結")
+                self.toast(tr("沒有找到可下載的影片：{detail}", detail=detail))
                 self.render("url", replace=True)
                 return
             self.state.items = all_items
-            self.log(f"已分析完成：{len(all_items)} 個項目。")
-            self.set_status("分析完成")
+            self.log(tr("已分析完成：{count} 個項目。", count=len(all_items)))
+            self.set_status(tr("分析完成"))
             if len(all_items) > 1:
                 self.render("select_items", replace=True)
             else:
                 self.render("mode", replace=True)
         except Exception as exc:
-            self.toast(f"分析失敗：{exc}")
+            self.toast(tr("分析失敗：{message}", message=exc))
             self.render("url", replace=True)
 
     def select_items_page(self) -> ft.Control:
@@ -2698,18 +3011,18 @@ class YtdlFletApp:
         def next_step(_event: Any) -> None:
             selected = [item for item in self.state.items if item.checked]
             if not selected:
-                self.toast("請至少選一個項目")
+                self.toast(tr("請至少選一個項目"))
                 return
             self.render("mode")
 
         return ft.Column(
             controls=[
-                self.page_title("STEP 2", "選擇要下載的項目", "偵測到播放清單或多個項目，先勾選你要的影片。"),
+                self.page_title("STEP 2", tr("選擇要下載的項目"), tr("偵測到播放清單或多個項目，先勾選你要的影片。")),
                 ft.Container(
                     content=ft.ListView(controls=rows, spacing=8, expand=True),
                     height=list_height,
                 ),
-                self.primary_button("下一步", next_step),
+                self.primary_button(tr("下一步"), next_step),
             ],
             width=page_width,
             spacing=14,
@@ -2731,8 +3044,8 @@ class YtdlFletApp:
             controls=[
                 self.page_title("STEP 2", "", "", scale=scale),
                 self.option_tile(
-                    title="影像 + 聲音",
-                    subtitle="下載影片，保留最佳可用音訊。",
+                    title=tr("影像 + 聲音"),
+                    subtitle=tr("下載影片，保留最佳可用音訊。"),
                     leading_icon=icon("MOVIE"),
                     selected=self.state.mode == "video",
                     on_click=choose("video"),
@@ -2741,8 +3054,8 @@ class YtdlFletApp:
                     width=tile_width,
                 ),
                 self.option_tile(
-                    title="只有聲音",
-                    subtitle="輸出 WAV、MP3 或 AAC。",
+                    title=tr("只有聲音"),
+                    subtitle=tr("輸出 WAV、MP3 或 AAC。"),
                     leading_icon=icon("MUSIC_NOTE"),
                     selected=self.state.mode == "audio",
                     on_click=choose("audio"),
@@ -2769,9 +3082,9 @@ class YtdlFletApp:
         tile_width = self.option_page_width()
         quality_tiles = []
         labels = {
-            "AUTO": ("AUTO", "懶人首選：4K 最佳畫質轉 H.264、音訊 320k AAC，輸出 MP4。"),
-            "4K": ("4K", "【AV1】畫質、壓縮效率高，舊設備可能無法播放。"),
-            "HD": ("HD", "【H.264】1080P，速度與大小較平衡。"),
+            "AUTO": ("AUTO", tr("懶人首選：4K 最佳畫質轉 H.264、音訊 320k AAC，輸出 MP4。")),
+            "4K": ("4K", tr("【AV1】畫質、壓縮效率高，舊設備可能無法播放。")),
+            "HD": ("HD", tr("【H.264】1080P，速度與大小較平衡。")),
         }
         for quality in VIDEO_QUALITIES:
             title, subtitle = labels[quality]
@@ -2796,7 +3109,7 @@ class YtdlFletApp:
 
         advanced_open = self.video_advanced_open or (self.state.video_codec != "AUTO")
         advanced_visible = ft.Checkbox(
-            label="進階編碼選項",
+            label=tr("進階編碼選項"),
             value=advanced_open,
             label_style=ft.TextStyle(size=max(13, int(14 * self.ui_scale * 1))),
             scale=1,
@@ -2816,8 +3129,8 @@ class YtdlFletApp:
 
         # AUTO removed from the advanced codec list per request.
         codec_labels = {
-            "H264": ("H.264", "相容性最好。"),
-            "AV1": ("AV1", "壓縮效率高。"),
+            "H264": ("H.264", tr("相容性最好。")),
+            "AV1": ("AV1", tr("壓縮效率高。")),
         }
         for codec_value in ("H264", "AV1"):
             title, subtitle = codec_labels[codec_value]
@@ -2840,7 +3153,7 @@ class YtdlFletApp:
             )
 
         subs_check = ft.Checkbox(
-            label="下載頻道主 CC 字幕（不含 YouTube 自動字幕）",
+            label=tr("下載頻道主 CC 字幕（不含 YouTube 自動字幕）"),
             value=self.state.download_manual_subs,
             label_style=ft.TextStyle(size=max(13, int(14 * self.ui_scale * 1))),
             scale=1,
@@ -2856,14 +3169,14 @@ class YtdlFletApp:
 
         group = ft.Column(
             controls=[
-                self.page_title("STEP 3", "選擇畫質", "一般直接選 AUTO；需要指定 4K 或 HD 時再切換。", scale=scale),
+                self.page_title("STEP 3", tr("選擇畫質"), tr("一般直接選 AUTO；需要指定 4K 或 HD 時再切換。"), scale=scale),
                 *quality_tiles,
                 ft.Divider(height=max(10, int(18 * scale)), color=BORDER),
                 advanced_visible,
                 codec_column,
                 subs_check,
                 self.primary_button(
-                    "開始下載", start,
+                    tr("開始下載"), start,
                     text_size=max(12, int(20 * scale)),
                     pad_x=int(28 * scale),
                     pad_y=int(18 * scale),
@@ -2895,9 +3208,9 @@ class YtdlFletApp:
         tile_width = self.option_page_width()
         format_tiles = []
         labels = {
-            "WAV": ("WAV", "不壓縮容器，檔案最大；來源仍受 YouTube 音源限制。"),
-            "MP3": ("MP3", "相容性最好，強制目標 320k。"),
-            "AAC": ("AAC", "輸出為常見 m4a/AAC，強制目標 320k。"),
+            "WAV": ("WAV", tr("不壓縮容器，檔案最大；來源仍受 YouTube 音源限制。")),
+            "MP3": ("MP3", tr("相容性最好，強制目標 320k。")),
+            "AAC": ("AAC", tr("輸出為常見 m4a/AAC，強制目標 320k。")),
         }
         for audio_format in AUDIO_FORMATS:
             title, subtitle = labels[audio_format]
@@ -2920,7 +3233,7 @@ class YtdlFletApp:
             )
 
         subs_check = ft.Checkbox(
-            label="下載頻道主 CC 字幕（不含 YouTube 自動字幕）",
+            label=tr("下載頻道主 CC 字幕（不含 YouTube 自動字幕）"),
             value=self.state.download_manual_subs,
             label_style=ft.TextStyle(size=max(13, int(14 * self.ui_scale * 1))),
             scale=1,
@@ -2936,11 +3249,11 @@ class YtdlFletApp:
 
         group = ft.Column(
             controls=[
-                self.page_title("STEP 3", "選擇聲音格式", "MP3 與 AAC 會用 320k 目標輸出。", scale=scale),
+                self.page_title("STEP 3", tr("選擇聲音格式"), tr("MP3 與 AAC 會用 320k 目標輸出。"), scale=scale),
                 *format_tiles,
                 subs_check,
                 self.primary_button(
-                    "開始轉檔", start,
+                    tr("開始轉檔"), start,
                     text_size=max(12, int(20 * scale)),
                     pad_x=int(28 * scale),
                     pad_y=int(18 * scale),
@@ -2965,20 +3278,20 @@ class YtdlFletApp:
     def summary_box(self) -> ft.Control:
         selected_count = len([item for item in self.state.items if item.checked]) or len(self.state.urls)
         if self.state.mode == "video":
-            mode_text = f"影片：{self.state.video_quality} / {self.state.video_codec}"
+            mode_text = tr("影片：{quality} / {codec}", quality=self.state.video_quality, codec=self.state.video_codec)
         else:
-            mode_text = f"聲音：{self.state.audio_format}"
+            mode_text = tr("聲音：{format}", format=self.state.audio_format)
         summary_lines = [
-            ft.Text("即將處理", size=12, color=TEXT_MUTED),
-            ft.Text(f"{selected_count} 個項目", size=16, weight=ft.FontWeight.BOLD, color=TEXT),
+            ft.Text(tr("即將處理"), size=12, color=TEXT_MUTED),
+            ft.Text(tr("{count} 個項目", count=selected_count), size=16, weight=ft.FontWeight.BOLD, color=TEXT),
             ft.Text(mode_text, size=13, color=TEXT_SOFT),
         ]
         if self.state.download_manual_subs:
             summary_lines.append(
-                ft.Text("字幕：頻道主 CC（不含自動字幕）", size=12, color=TEXT_SOFT)
+                ft.Text(tr("字幕：頻道主 CC（不含自動字幕）"), size=12, color=TEXT_SOFT)
             )
         summary_lines.append(
-            ft.Text(f"儲存到：{self.state.settings.output_dir}", size=12, color=TEXT_MUTED)
+            ft.Text(tr("儲存到：{path}", path=self.state.settings.output_dir), size=12, color=TEXT_MUTED)
         )
         return ft.Container(
             content=ft.Column(
@@ -2996,35 +3309,59 @@ class YtdlFletApp:
     def settings_page(self) -> ft.Control:
         scale = self.ui_scale * 0.7
         page_width = int(self.content_width() * 0.7)
-        note_size = self.settings_note_size(scale)
         output_text = ft.Text(self.state.settings.output_dir, color=TEXT_SOFT, size=max(9, int(12 * scale)))
 
         async def choose_folder(_event: Any) -> None:
             try:
                 selected = await ft.FilePicker().get_directory_path(
-                    dialog_title="選擇儲存資料夾",
+                    dialog_title=tr("選擇儲存資料夾"),
                     initial_directory=self.state.settings.output_dir,
                 )
             except Exception as exc:
-                self.toast(f"目前環境無法選擇資料夾：{exc}")
+                self.toast(tr("目前環境無法選擇資料夾：{message}", message=exc))
                 return
             if selected:
                 self.state.settings.output_dir = selected
                 save_settings(self.state.settings)
                 output_text.value = selected
                 output_text.update()
-                self.toast("已更新儲存位置")
+                self.toast(tr("已更新儲存位置"))
 
         def reset_folder(_event: Any) -> None:
             self.state.settings.output_dir = str(get_downloads_dir())
             save_settings(self.state.settings)
             output_text.value = self.state.settings.output_dir
             output_text.update()
-            self.toast("已改回下載資料夾")
+            self.toast(tr("已改回下載資料夾"))
 
         open_done = ft.Switch(value=self.state.settings.open_folder_when_done)
         delete_temp = ft.Switch(value=self.state.settings.delete_temp_source)
         prefer_nvenc = ft.Switch(value=self.state.settings.prefer_nvenc)
+        language_dropdown = ft.Dropdown(
+            value=self.state.settings.language,
+            options=[
+                ft.DropdownOption(key=LANGUAGE_AUTO, text=tr("自動（依系統）")),
+                ft.DropdownOption(key=LANGUAGE_ZH, text=tr("中文")),
+                ft.DropdownOption(key=LANGUAGE_EN, text=tr("英文")),
+            ],
+            width=max(150, int(190 * scale)),
+            dense=True,
+            text_size=max(10, int(13 * scale)),
+            color=TEXT,
+            border_color=BORDER,
+            focused_border_color=YT_RED,
+            bgcolor=SURFACE,
+        )
+
+        def change_language(_event: Any = None) -> None:
+            preference = language_dropdown.value or LANGUAGE_AUTO
+            self.state.settings.language = preference
+            self.language = set_active_language(preference)
+            save_settings(self.state.settings)
+            self.status_text = tr("就緒")
+            self.render("settings", replace=True)
+
+        language_dropdown.on_select = change_language
 
         def save_switches(_event: Any = None) -> None:
             self.state.settings.open_folder_when_done = bool(open_done.value)
@@ -3042,12 +3379,16 @@ class YtdlFletApp:
                 ft.Container(
                     content=ft.Column(
                         controls=[
-                            ft.Text("儲存位置", size=max(10, int(14 * scale)), weight=ft.FontWeight.BOLD, color=TEXT),
+                            ft.Text(tr("儲存位置"), size=max(10, int(14 * scale)), weight=ft.FontWeight.BOLD, color=TEXT),
                             output_text,
                             ft.Row(
                                 controls=[
                                     ft.OutlinedButton(
-                                        content="選擇資料夾",
+                                        content=self.button_label(
+                                            tr("選擇資料夾"),
+                                            max(10, int(13 * scale)),
+                                            ft.FontWeight.W_600,
+                                        ),
                                         icon=icon("FOLDER_OPEN"),
                                         on_click=choose_folder,
                                         style=ft.ButtonStyle(
@@ -3057,11 +3398,17 @@ class YtdlFletApp:
                                         ),
                                     ),
                                     ft.TextButton(
-                                        content="改回下載資料夾",
+                                        content=self.button_label(
+                                            tr("改回下載資料夾"),
+                                            max(10, int(13 * scale)),
+                                            ft.FontWeight.W_500,
+                                        ),
                                         on_click=reset_folder,
                                         style=ft.ButtonStyle(color=TEXT_MUTED),
                                     ),
-                                ]
+                                ],
+                                wrap=True,
+                                run_spacing=max(4, int(8 * scale)),
                             ),
                         ],
                         spacing=max(4, int(8 * scale)),
@@ -3072,23 +3419,10 @@ class YtdlFletApp:
                     padding=max(8, int(14 * scale)),
                     shadow=glass_shadow(),
                 ),
-                self.setting_switch("完成後自動開啟資料夾", open_done, scale=scale),
-                self.setting_switch("4K H.264 完成後刪除原始暫存檔", delete_temp, scale=scale),
-                self.setting_switch("偵測到 NVIDIA 時優先使用 NVENC", prefer_nvenc, scale=scale),
-                ft.Container(
-                    content=ft.Text(
-                        f"版本 {APP_VERSION}"
-                        + (f"  ·  啟動時會檢查 GitHub Releases 是否有更新（{GITHUB_REPO}）。" if GITHUB_REPO else "  ·  尚未設定 GitHub 倉庫，略過更新檢查。")
-                        + " 啟動時仍會自動更新核心，並使用內建 Deno 處理 YouTube 驗證。",
-                        size=note_size,
-                        color=TEXT_MUTED,
-                    ),
-                    padding=max(8, int(12 * scale)),
-                    bgcolor=SURFACE_SOFT,
-                    border_radius=CARD_RADIUS,
-                    border=border_all(1, BORDER),
-                    shadow=glass_shadow(),
-                ),
+                self.setting_row(tr("語言"), language_dropdown, scale=scale),
+                self.setting_switch(tr("完成後自動開啟資料夾"), open_done, scale=scale),
+                self.setting_switch(tr("4K H.264 完成後刪除原始暫存檔"), delete_temp, scale=scale),
+                self.setting_switch(tr("偵測到 NVIDIA 時優先使用 NVENC"), prefer_nvenc, scale=scale),
             ],
             width=page_width,
             spacing=max(7, int(12 * scale)),
@@ -3129,13 +3463,13 @@ class YtdlFletApp:
 
     def begin_download(self) -> None:
         if self.state.yt_dlp is None:
-            self.toast("核心尚未準備完成")
+            self.toast(tr("核心尚未準備完成"))
             return
         selected_items = [item for item in self.state.items if item.checked]
         if not selected_items:
             selected_items = [VideoItem(title=url, url=url) for url in self.state.urls]
         if not selected_items:
-            self.toast("沒有可下載的項目")
+            self.toast(tr("沒有可下載的項目"))
             return
         output_dir = Path(self.state.settings.output_dir).expanduser()
         self.state.last_output_dir = str(output_dir)
@@ -3186,7 +3520,7 @@ class YtdlFletApp:
             height=142,
             alignment=align_center(),
         )
-        self.progress_detail = ft.Text("準備中...", size=13, color=TEXT_MUTED, text_align=ft.TextAlign.CENTER)
+        self.progress_detail = ft.Text(tr("準備中..."), size=13, color=TEXT_MUTED, text_align=ft.TextAlign.CENTER)
         self.progress_status = ft.Text(
             self.status_text,
             size=14,
@@ -3198,7 +3532,7 @@ class YtdlFletApp:
         )
         self.complete_action = ft.Container(visible=False)
 
-        self.stop_button = self._progress_text_button("停止", icon("STOP"), self.cancel_download)
+        self.stop_button = self._progress_text_button(tr("停止"), icon("STOP"), self.cancel_download)
         self.action_holder = ft.Container(content=self.stop_button)
 
         layout = ft.Column(
@@ -3235,7 +3569,7 @@ class YtdlFletApp:
         self, text: str, leading_icon: Any, on_click: Callable[..., None]
     ) -> ft.Control:
         return ft.TextButton(
-            content=text,
+            content=self.button_label(text, 14, ft.FontWeight.W_500),
             icon=leading_icon,
             on_click=on_click,
             style=ft.ButtonStyle(
@@ -3324,16 +3658,16 @@ class YtdlFletApp:
             self.progress_done = True
             self._apply_progress(100.0)
             if self.progress_status:
-                self.progress_status.value = "完成"
+                self.progress_status.value = tr("完成")
             if self.progress_detail:
-                self.progress_detail.value = "已完成，點中間的播放鍵可直接開啟檔案。"
+                self.progress_detail.value = tr("已完成，點中間的播放鍵可直接開啟檔案。")
             # Swap the "100%" text for a play button that opens the finished file.
             if self.percent_holder is not None:
                 self.percent_holder.content = ft.IconButton(
                     icon=icon("PLAY_CIRCLE_FILL"),
                     icon_color=YT_RED,
                     icon_size=72,
-                    tooltip="開啟檔案",
+                    tooltip=tr("開啟檔案"),
                     on_click=lambda _e: self.open_last_file(),
                 )
             self._set_stop_button_home()
@@ -3344,7 +3678,7 @@ class YtdlFletApp:
             if self.progress_status:
                 self.progress_status.value = message
             if self.progress_detail:
-                self.progress_detail.value = "請查看記錄或重新嘗試。"
+                self.progress_detail.value = tr("請查看記錄或重新嘗試。")
             self._set_stop_button_home()
 
     def _set_stop_button_home(self) -> None:
@@ -3355,14 +3689,16 @@ class YtdlFletApp:
             self.action_holder.content = ft.Row(
                 controls=[
                     self._progress_text_button(
-                        "開資料夾", icon("FOLDER_OPEN"), lambda _e: self.open_output_folder()
+                        tr("開資料夾"), icon("FOLDER_OPEN"), lambda _e: self.open_output_folder()
                     ),
                     self._progress_text_button(
-                        "回到首頁", icon("HOME"), lambda _e: self.go_home()
+                        tr("回到首頁"), icon("HOME"), lambda _e: self.go_home()
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 spacing=8,
+                wrap=True,
+                run_spacing=8,
             )
         except Exception:
             pass
@@ -3388,12 +3724,12 @@ class YtdlFletApp:
             else:
                 subprocess.Popen(["xdg-open", str(path)])
         except Exception as exc:
-            self.toast(f"無法開啟檔案：{exc}")
+            self.toast(tr("無法開啟檔案：{message}", message=exc))
 
     def cancel_download(self, _event: Any = None) -> None:
         if self.current_job:
             self.current_job.cancel()
-            self.on_download_status("正在停止...")
+            self.on_download_status(tr("正在停止..."))
 
     def open_output_folder(self) -> None:
         folder = Path(self.state.last_output_dir or self.state.settings.output_dir)
@@ -3405,7 +3741,7 @@ class YtdlFletApp:
             else:
                 subprocess.Popen(["xdg-open", str(folder)])
         except Exception as exc:
-            self.toast(f"無法開啟資料夾：{exc}")
+            self.toast(tr("無法開啟資料夾：{message}", message=exc))
 
 
 def main(page: ft.Page) -> None:

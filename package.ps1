@@ -10,7 +10,7 @@ try {
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dist = Join-Path $root "dist"
-$zip = Join-Path $dist "YTDL-GUI.zip"
+$zip = Join-Path $dist "YTDL-WIN.zip"
 $staging = Join-Path $dist "YTDL"
 $appStaging = Join-Path $staging "app"
 $cacheDir = Join-Path $root "cache"

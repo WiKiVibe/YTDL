@@ -1,6 +1,6 @@
 # YTDL
 
-Windows GUI for [yt-dlp](https://github.com/yt-dlp/yt-dlp). Paste a YouTube URL (or playlist), pick video/audio options, and download. Optional **channel owner CC subtitles** (never YouTube auto-captions).
+Desktop GUI for [yt-dlp](https://github.com/yt-dlp/yt-dlp). Paste a YouTube URL (or playlist), pick video/audio options, and download. Optional **channel owner CC subtitles** (never YouTube auto-captions).
 
 > Please only download content you have the right to save or use. This project is a front-end for yt-dlp; you are responsible for how you use it.
 
@@ -8,7 +8,7 @@ Windows GUI for [yt-dlp](https://github.com/yt-dlp/yt-dlp). Paste a YouTube URL 
 
 ## Download (Windows)
 
-1. Open [Releases](https://github.com/WiKiVibe/YTDL/releases) and download **YTDL-GUI.zip**.
+1. Open [Releases](https://github.com/WiKiVibe/YTDL/releases) and download **YTDL-WIN.zip**.
 2. Unzip the whole folder (do not run files from inside the ZIP window).
 3. Run `01.Install.bat` once (creates a desktop shortcut).
 4. Later use the desktop shortcut or `02.RUN.bat`.
@@ -19,14 +19,13 @@ More detail is in the ZIP as `README.txt`.
 
 ---
 
-## macOS
+## Download (macOS Apple Silicon)
 
-There is **no portable Mac download** in Releases yet (no `.app` / `.dmg`).
+1. Open [Releases](https://github.com/WiKiVibe/YTDL/releases) and download **YTDL-MAC.zip**.
+2. Unzip it and move `YTDL.app` to Applications.
+3. On first launch, Control-click `YTDL.app`, choose **Open**, then confirm **Open**.
 
-- End users on Mac: **not supported** as a one-click install today.
-- Developers who already use Terminal may try the experimental scripts in the repo (`install.command` / `run.command`; see [`README-macOS.md`](README-macOS.md)). This requires installing Python yourself and is not the same experience as the Windows ZIP.
-
-A dedicated Mac build / distribution path is under consideration; it is not ready for general download.
+The current macOS build is ad-hoc signed but not Apple-notarized. See [`README-macOS.md`](README-macOS.md) for source builds and Gatekeeper details.
 
 ---
 

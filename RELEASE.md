@@ -53,32 +53,46 @@ Prerequisites on the build PC:
 Artifact:
 
 ```text
-dist\YTDL-GUI.zip
+dist\YTDL-WIN.zip
 ```
 
-### 3. Create the GitHub Release
+### 3. Build the macOS ZIP (Apple Silicon Mac)
+
+```sh
+./build_macos_app.command
+```
+
+Artifact:
+
+```text
+dist/YTDL-MAC.zip
+```
+
+### 4. Create the GitHub Release
 
 1. GitHub → **Releases** → **Draft a new release**
-2. **Choose a tag**: `v1.0.0` (create new tag on publish)
-3. **Title**: `v1.0.0`
+2. **Choose a tag**: `v1.0.1` (create new tag on publish)
+3. **Title**: `YTDL v1.0.1`
 4. **Describe** user-facing changes (Chinese or English is fine)
-5. **Attach** `dist\YTDL-GUI.zip`
+5. **Attach** `dist\YTDL-WIN.zip` and `dist/YTDL-MAC.zip` (the Mac asset can be added later)
 6. Publish
 
-### 4. README link
+### 5. README link
 
 The main README points users to Releases for the ZIP. After the first release exists, the download link works for visitors.
 
 ## Checklist before upload
 
-- [ ] Unzip `YTDL-GUI.zip` on a clean folder and run `01.Install.bat`
+- [ ] Unzip `YTDL-WIN.zip` on a clean folder and run `01.Install.bat`
 - [ ] Launch via shortcut / `02.RUN.bat`
 - [ ] Download one short public video
 - [ ] Optional: test “下載頻道主 CC 字幕”
 - [ ] Confirm ZIP size is reasonable (typically hundreds of MB because of embedded Python)
+- [ ] Open `YTDL.app` from `YTDL-MAC.zip` on an Apple Silicon Mac
 
 ## What not to do
 
-- Do not commit `dist\YTDL-GUI.zip` into the repo
+- Do not commit `dist\YTDL-WIN.zip` into the repo
+- Do not commit `dist/YTDL-MAC.zip` into the repo
 - Do not commit `python\` or `runtime\`
 - Do not upload only `src\` without the packaging layout if you intend “double-click for non-devs”

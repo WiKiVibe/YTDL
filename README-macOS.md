@@ -1,8 +1,10 @@
 # YTDL for macOS
 
-This is **not** the same as the Windows Release ZIP. There is no one-click Mac download for end users yet.
+The Release package is `YTDL-MAC.zip` for Apple Silicon. Unzip it, move
+`YTDL.app` to Applications, then Control-click the app and choose **Open** on
+first launch. The app is ad-hoc signed but not Apple-notarized.
 
-You need a Mac, Terminal comfort, and Python installed yourself.
+The instructions below are for running or rebuilding YTDL from source.
 
 ## Run from source
 
@@ -36,6 +38,7 @@ The build creates:
 
 ```text
 dist/macos/YTDL.app
+dist/YTDL-MAC.zip
 ```
 
 For later updates from a Git clone, run `update_and_build_mac.command`. It

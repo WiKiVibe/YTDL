@@ -35,7 +35,7 @@ Portable builds are **not** committed. Maintainers build on Windows:
 .\package.ps1
 ```
 
-Upload `dist\YTDL-GUI.zip` to a GitHub Release. See `README.md` for details.
+Upload `dist\YTDL-WIN.zip` to a GitHub Release. See `README.md` for details.
 
 ## Issues
 

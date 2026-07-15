@@ -67,7 +67,7 @@ PACK_ARGS=(
     --add-data "$APP_DIR/assets:assets"
     --hidden-import "yt_dlp" "yt_dlp.extractor" "yt_dlp.postprocessor" "imageio_ffmpeg"
     --product-name "YTDL"
-    --product-version "1.0.0"
+    --product-version "1.0.1"
     --bundle-id "app.local.ytdl"
     --copyright "YTDL"
     --yes
@@ -81,6 +81,7 @@ fi
 "$FLET_CMD" "${PACK_ARGS[@]}"
 
 APP_BUNDLE="$APP_DIR/dist/macos/YTDL.app"
+RELEASE_ZIP="$APP_DIR/dist/YTDL-MAC.zip"
 EXECUTABLE="$APP_BUNDLE/Contents/MacOS/YTDL"
 if [ ! -x "$EXECUTABLE" ]; then
     echo "Packaging finished but YTDL.app was not created correctly."
@@ -88,12 +89,22 @@ if [ ! -x "$EXECUTABLE" ]; then
 fi
 
 plutil -lint "$APP_BUNDLE/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "1.0.1" "$APP_BUNDLE/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "2" "$APP_BUNDLE/Contents/Info.plist"
 codesign --force --deep --sign - --timestamp=none "$APP_BUNDLE"
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
+rm -f "$RELEASE_ZIP"
+ditto -c -k --sequesterRsrc --keepParent "$APP_BUNDLE" "$RELEASE_ZIP"
+if [ ! -s "$RELEASE_ZIP" ]; then
+    echo "Packaging finished but YTDL-MAC.zip was not created correctly."
+    exit 1
+fi
+
 echo
-echo "Single-window macOS app complete:"
+echo "Single-window macOS app and Release ZIP complete:"
 echo "  $APP_BUNDLE"
+echo "  $RELEASE_ZIP"
 echo
 echo "Open it with:"
 echo "  open \"$APP_BUNDLE\""

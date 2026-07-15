@@ -38,7 +38,7 @@ def _use_private_macos_flet_cache() -> None:
             Path.home()
             / ".flet"
             / "client"
-            / f"ytdl-desktop-1.0.0-flet-{flet_desktop.version.version}"
+            / f"ytdl-desktop-1.0.1-flet-{flet_desktop.version.version}"
         )
 
         def ytdl_client_storage_dir() -> Path:

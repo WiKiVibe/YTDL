@@ -15,7 +15,7 @@ RUNTIME_EXE = RUNTIME_DIR / "flet.exe"
 MARKER_PATH = RUNTIME_DIR / ".ytdl-runtime-version"
 
 APP_NAME = "YTDL"
-APP_VERSION = "1.0.0.0"
+APP_VERSION = "1.0.1.0"
 COPYRIGHT = "YTDL"
 
 RT_ICON = 3
