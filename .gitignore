@@ -10,6 +10,7 @@ cache/
 downloads/
 build/
 dist_exe/
+*.spec
 
 # Python noise
 __pycache__/

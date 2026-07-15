@@ -1018,24 +1018,27 @@ def load_background_bytes() -> bytes | None:
 
 
 def make_background_control() -> ft.Control:
-    """Background for the shell. Prefer solid color if image fails (packaged builds)."""
+    """Create the same embedded background on source and packaged builds."""
     data = load_background_bytes()
     if not data:
+        startup_log(f"background missing: {background_image_path()}")
         return ft.Container(bgcolor=BG, expand=True)
     try:
         import base64
 
         encoded = base64.b64encode(data).decode("ascii")
-        # Prefer src_base64 when available (more reliable in packaged Flutter views).
+        startup_log(f"background loaded: {background_image_path()} ({len(data)} bytes)")
         image_kwargs: dict[str, Any] = {
             "fit": ft.BoxFit.COVER,
             "expand": True,
         }
+        # Data URIs work with both the desktop client and Flet's embedded host.
         try:
-            return ft.Image(src_base64=encoded, **image_kwargs)
+            return ft.Image(src=f"data:image/jpeg;base64,{encoded}", **image_kwargs)
         except TypeError:
-            return ft.Image(src=data, **image_kwargs)
-    except Exception:
+            return ft.Image(src_base64=encoded, **image_kwargs)
+    except Exception as exc:
+        startup_log(f"background render failed: {exc!r}")
         return ft.Container(bgcolor=BG, expand=True)
 
 
@@ -1791,11 +1794,12 @@ class YtdlFletApp:
             self.ui_scale = fit
             phys_w = int(phys_w * fit)
             phys_h = int(phys_h * fit)
-        # Packaged macOS: prefer a compact window that fits laptop screens.
+        # Preserve the original tall composition on a typical MacBook display.
         if is_packaged_app() and sys.platform == "darwin":
-            phys_w = min(phys_w, 720)
-            phys_h = min(phys_h, 900)
-            self.ui_scale = min(self.ui_scale, 0.85)
+            mac_fit = min(1.0, 900 / DEFAULT_WINDOW_HEIGHT)
+            phys_w = int(DEFAULT_WINDOW_WIDTH * mac_fit)
+            phys_h = int(DEFAULT_WINDOW_HEIGHT * mac_fit)
+            self.ui_scale = min(self.ui_scale, mac_fit)
         win_w = max(1, int(round(phys_w / scale_factor)))
         win_h = max(1, int(round(phys_h / scale_factor)))
         min_w = int(win_w * 0.6)
@@ -1815,8 +1819,7 @@ class YtdlFletApp:
             self.page.window_min_width = min_w
             self.page.window_min_height = min_h
         self.page.padding = 0
-        # Slightly lighter than pure black so a "blank UI" is easier to spot.
-        self.page.bgcolor = BG if not (is_packaged_app() and sys.platform == "darwin") else "#1E1E1E"
+        self.page.bgcolor = BG
         self.page.theme_mode = ft.ThemeMode.DARK
         try:
             self.page.horizontal_alignment = ft.CrossAxisAlignment.STRETCH
@@ -1835,10 +1838,7 @@ class YtdlFletApp:
                     break
                 except Exception:
                     continue
-        # Do not clear fonts — empty fonts map can break text rendering.
-        # Skip resize-driven re-render on packaged macOS (first frames are 0x0).
-        if not (is_packaged_app() and sys.platform == "darwin"):
-            self.page.on_resize = self.on_resize
+        self.page.on_resize = self.on_resize
         startup_log(f"configure_page window={win_w}x{win_h} ui_scale={self.ui_scale}")
 
     def on_resize(self, _event: Any = None) -> None:
@@ -2228,52 +2228,6 @@ class YtdlFletApp:
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            )
-
-        # Packaged macOS: nested Stack + Image often paints a solid black frame.
-        # Use a simple Column shell (no background image) which is reliable.
-        # Also avoid IconButton-only chrome — some builds fail to load Material icons.
-        if is_packaged_app() and sys.platform == "darwin":
-            settings_link = ft.TextButton(
-                content="Settings",
-                on_click=lambda _e: self.render("settings"),
-                visible=settings_visible,
-            )
-            back_link = ft.TextButton(
-                content="Back",
-                on_click=self.back,
-                visible=can_back,
-            )
-            return ft.Container(
-                expand=True,
-                bgcolor="#1E1E1E",
-                padding=20,
-                content=ft.Column(
-                    controls=[
-                        ft.Text(
-                            "YTDL",
-                            size=28,
-                            weight=ft.FontWeight.BOLD,
-                            color="#FFFFFF",
-                            font_family="Helvetica",
-                        ),
-                        ft.Text(
-                            "macOS build — if you only saw a black window before, fonts/layout were broken.",
-                            size=12,
-                            color="#A0A0A0",
-                            font_family="Helvetica",
-                        ),
-                        ft.Row(
-                            controls=[back_link, settings_link],
-                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                        ),
-                        ft.Container(content=content, expand=True, alignment=align_center()),
-                        bottom_bar,
-                    ],
-                    expand=True,
-                    spacing=10,
-                    scroll=ft.ScrollMode.AUTO,
-                ),
             )
 
         # Reserve space at top/bottom so centered content never collides with the

@@ -20,14 +20,17 @@ copy_item() {
 copy_item "src"
 copy_item "tools"
 copy_item "pic"
+copy_item "pyproject.toml"
 copy_item "requirements.txt"
 copy_item "main.py"
 copy_item "install.command"
 copy_item "run.command"
 copy_item "build_macos_app.command"
+copy_item "update_and_build_mac.command"
+copy_item "diagnose_macos_app.command"
 copy_item "README-macOS.md"
 
-chmod +x "$STAGING/install.command" "$STAGING/run.command" "$STAGING/build_macos_app.command" 2>/dev/null || true
+chmod +x "$STAGING/install.command" "$STAGING/run.command" "$STAGING/build_macos_app.command" "$STAGING/update_and_build_mac.command" "$STAGING/diagnose_macos_app.command" 2>/dev/null || true
 chmod +x "$STAGING/tools/install_deno_macos.sh" 2>/dev/null || true
 
 find "$STAGING" -type d -name "__pycache__" -prune -exec rm -rf {} +

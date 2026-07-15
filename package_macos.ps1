@@ -32,11 +32,14 @@ function Copy-ProjectItem($name) {
     "src",
     "tools",
     "pic",
+    "pyproject.toml",
     "requirements.txt",
     "main.py",
     "install.command",
     "run.command",
     "build_macos_app.command",
+    "update_and_build_mac.command",
+    "diagnose_macos_app.command",
     "package_macos.sh",
     "README-macOS.md"
 ) | ForEach-Object {

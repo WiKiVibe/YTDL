@@ -9,7 +9,7 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
 
 echo
-echo "YTDL macOS — update + build"
+echo "YTDL macOS - update + build"
 echo "==========================="
 echo "Folder: $APP_DIR"
 echo
@@ -20,29 +20,34 @@ if ! command -v git >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "[1/4] Fetch GitHub..."
+if [ ! -d "$APP_DIR/.git" ]; then
+  echo "This folder is not a Git clone, so it cannot update itself."
+  echo "Clone https://github.com/WiKiVibe/YTDL.git once, then run this script there."
+  read -r -p "Press Return to close. " _
+  exit 1
+fi
+
+echo "[1/5] Fetch GitHub..."
 git fetch origin
 
-echo "[2/4] Reset to origin/main (discards local uncommitted changes)..."
+echo "[2/5] Reset to origin/main (discards local uncommitted changes)..."
 git reset --hard origin/main
 
 echo "[3/5] chmod scripts..."
 chmod +x \
   build_macos_app.command \
+  diagnose_macos_app.command \
   run.command \
   install.command \
   update_and_build_mac.command \
   tools/install_deno_macos.sh 2>/dev/null || true
 
-echo "[4/5] Clear Flet extract cache (prevents stale black-screen builds)..."
-# Flet runs code from here, NOT only from this git folder:
-#   ~/Library/Application Support/app.local.ytdl/flet/app/main.pyc
+echo "[4/5] Clear obsolete Flet extract cache..."
 rm -rf "${HOME}/Library/Application Support/app.local.ytdl" 2>/dev/null || true
 rm -f "${HOME}/Library/Application Support/YTDL/startup.log" 2>/dev/null || true
-echo "    cleared app.local.ytdl (if it existed)"
 
 echo "[5/5] Build macOS app (this can take several minutes)..."
-echo "Keep external SSD mounted if Xcode lives there."
+echo "Packaging the single Flet Desktop window with PyInstaller."
 echo
 ./build_macos_app.command
 

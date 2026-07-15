@@ -33,7 +33,10 @@ echo "[2/5] Updating installer tools..."
 "$PYTHON" -m pip install --upgrade pip
 
 echo "[3/5] Installing yt-dlp, Flet and media tools..."
-"$PYTHON" -m pip install --upgrade -r "$APP_DIR/requirements.txt"
+"$PYTHON" -m pip install --upgrade \
+    -r "$APP_DIR/requirements.txt" \
+    "flet[all]==0.85.3" \
+    "pyinstaller>=6.0,<7"
 
 echo "[4/5] Preparing Deno JavaScript runtime..."
 if [ -f "$APP_DIR/tools/install_deno_macos.sh" ]; then
@@ -46,6 +49,9 @@ echo "[5/5] Preparing launch scripts..."
 chmod +x "$APP_DIR/run.command" "$APP_DIR/install.command" 2>/dev/null || true
 if [ -f "$APP_DIR/build_macos_app.command" ]; then
     chmod +x "$APP_DIR/build_macos_app.command" 2>/dev/null || true
+fi
+if [ -f "$APP_DIR/diagnose_macos_app.command" ]; then
+    chmod +x "$APP_DIR/diagnose_macos_app.command" 2>/dev/null || true
 fi
 if [ -f "$APP_DIR/tools/install_deno_macos.sh" ]; then
     chmod +x "$APP_DIR/tools/install_deno_macos.sh" 2>/dev/null || true

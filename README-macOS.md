@@ -1,4 +1,4 @@
-# YTDL for macOS (experimental)
+# YTDL for macOS
 
 This is **not** the same as the Windows Release ZIP. There is no one-click Mac download for end users yet.
 
@@ -20,14 +20,47 @@ The installer creates a local `.venv`, installs dependencies from `requirements.
 
 ## Build a native `.app` (on a Mac)
 
-Requires Xcode Command Line Tools. On the Mac:
+Requires Python 3.10 or newer and at least 5 GB of free space. This project
+uses `flet pack` / PyInstaller for macOS because it packages the working Flet
+Desktop window directly and does not create a second serious_python/Flutter
+host window. Xcode, Flutter and CocoaPods are not used by this build route.
+
+On the Mac:
 
 ```sh
-chmod +x build_macos_app.command tools/install_deno_macos.sh
+chmod +x build_macos_app.command diagnose_macos_app.command tools/install_deno_macos.sh
 ./build_macos_app.command
 ```
 
-Output is typically under `dist/macos`.
+The build creates:
+
+```text
+dist/macos/YTDL.app
+```
+
+For later updates from a Git clone, run `update_and_build_mac.command`. It
+fetches `origin/main`, replaces the local tracked files, and rebuilds the app.
+
+Flet is pinned to 0.85.3 so source runs and packaged builds use the same API.
+
+The installer includes Flet Desktop and PyInstaller. The finished `.app`
+contains one Flet Desktop window and no separate embedded Flutter host.
+
+## Diagnose an empty or black window
+
+Do not launch the app from Finder while diagnosing. Run:
+
+```sh
+./diagnose_macos_app.command
+```
+
+This launches the executable inside the bundle, captures its console output,
+checks the signature and entitlements, and prints the Python startup log after
+the app closes. Logs are saved in:
+
+```text
+~/Library/Application Support/YTDL/
+```
 
 ### Gatekeeper / “unidentified developer”
 
