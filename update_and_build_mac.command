@@ -55,8 +55,6 @@ else
     diagnose_macos_app.command \
     install.command \
     main.py \
-    package_macos.ps1 \
-    package_macos.sh \
     pic \
     pyproject.toml \
     requirements.txt \

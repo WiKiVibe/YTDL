@@ -170,7 +170,7 @@ APP_VERSION = "1.0.2"
 # Leave empty to disable. Example: "yourname/YTDL"
 # Override at runtime with env var YTDL_GITHUB_REPO if needed.
 GITHUB_REPO = (os.environ.get("YTDL_GITHUB_REPO") or "WiKiVibe/YTDL").strip()
-WIKIVIBE_URL = f"https://github.com/{GITHUB_REPO}"
+WIKIVIBE_URL = "https://portaly.cc/WiKiVibe"
 
 LANGUAGE_AUTO = "auto"
 LANGUAGE_ZH = "zh"
