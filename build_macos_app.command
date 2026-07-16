@@ -33,6 +33,13 @@ if [ ! -x "$FLET_CMD" ]; then
     exit 1
 fi
 
+APP_VERSION="$(awk -F'"' '$0 == "[project]" { section=1; next } /^\[/ { section=0 } section && /^version = / { print $2; exit }' "$APP_DIR/pyproject.toml")"
+BUILD_NUMBER="$(awk '$0 == "[tool.flet]" { section=1; next } /^\[/ { section=0 } section && /^build_number = / { print $3; exit }' "$APP_DIR/pyproject.toml")"
+if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+    echo "Invalid app version or build number in pyproject.toml."
+    exit 1
+fi
+
 mkdir -p "$APP_DIR/assets" "$APP_DIR/dist"
 cp -f "$APP_DIR/pic/YTDL_LOGO.png" "$APP_DIR/assets/icon.png"
 
@@ -67,7 +74,7 @@ PACK_ARGS=(
     --add-data "$APP_DIR/assets:assets"
     --hidden-import "yt_dlp" "yt_dlp.extractor" "yt_dlp.postprocessor" "imageio_ffmpeg"
     --product-name "YTDL"
-    --product-version "1.0.1"
+    --product-version "$APP_VERSION"
     --bundle-id "app.local.ytdl"
     --copyright "YTDL"
     --yes
@@ -89,8 +96,8 @@ if [ ! -x "$EXECUTABLE" ]; then
 fi
 
 plutil -lint "$APP_BUNDLE/Contents/Info.plist"
-plutil -replace CFBundleShortVersionString -string "1.0.1" "$APP_BUNDLE/Contents/Info.plist"
-plutil -replace CFBundleVersion -string "2" "$APP_BUNDLE/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$APP_VERSION" "$APP_BUNDLE/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP_BUNDLE/Contents/Info.plist"
 codesign --force --deep --sign - --timestamp=none "$APP_BUNDLE"
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
